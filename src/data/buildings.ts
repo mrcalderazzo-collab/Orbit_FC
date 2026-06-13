@@ -163,21 +163,28 @@ export const BUILDING_CHANGES: BuildingChange[] = [
   ...changesFor("b7", "T-4788"), ...changesFor("b8"),
 ];
 
+const TOUR_IMG = {
+  lobby: img("1564013799919-ab600027ffc6"),
+  cellar: img("1581092160562-40aa08e78837"),
+  floor: img("1502672260266-1c1ef2d93688"),
+  roof: img("1486325212027-8081e485255e"),
+};
+
 const tourFor = (buildingId: string, ticketId?: string): BuildingTourArea[] => [
-  { id: `${buildingId}-tour-lobby`, buildingId, floor: "1", name: "Lobby and front desk", description: "Primary resident entry, front desk, package area, and main elevator bank.", viewpoint: "Standing inside the main entrance facing the elevator lobby.", accent: "#38bdf8", hotspots: [
+  { id: `${buildingId}-tour-lobby`, buildingId, floor: "1", name: "Lobby and front desk", description: "Primary resident entry, front desk, package area, and main elevator bank.", viewpoint: "Standing inside the main entrance facing the elevator lobby.", accent: "#38bdf8", image: TOUR_IMG.lobby, hotspots: [
     { id: "front-desk", label: "Front desk", kind: "access", x: 22, y: 58, detail: "Building keys, visitor controls, and vendor sign-in." },
     { id: "elevator-bank", label: "Elevator bank", kind: ticketId === "T-4801" ? "issue" : "equipment", x: 72, y: 43, detail: ticketId === "T-4801" ? "Car B is linked to active ticket T-4801." : "Main passenger elevator bank.", relatedTicketId: ticketId === "T-4801" ? ticketId : undefined },
   ] },
-  { id: `${buildingId}-tour-cellar`, buildingId, floor: "B1", name: "Cellar and mechanical rooms", description: "Boiler, domestic water, electrical, gas, and service access.", viewpoint: "At the cellar corridor junction with all mechanical rooms visible.", accent: "#f59e0b", hotspots: [
+  { id: `${buildingId}-tour-cellar`, buildingId, floor: "B1", name: "Cellar and mechanical rooms", description: "Boiler, domestic water, electrical, gas, and service access.", viewpoint: "At the cellar corridor junction with all mechanical rooms visible.", accent: "#f59e0b", image: TOUR_IMG.cellar, hotspots: [
     { id: "water-main", label: "Water main shutoff", kind: "equipment", x: 28, y: 48, detail: "Primary domestic-water isolation point." },
     { id: "boiler-room", label: "Boiler room", kind: "equipment", x: 68, y: 36, detail: "Heating plant, controls, and service clearances." },
     { id: "access-file", label: "Access map", kind: "document", x: 52, y: 74, detail: "Open the current service-entry and key map.", fileId: `${buildingId}-file-access` },
   ] },
-  { id: `${buildingId}-tour-typical`, buildingId, floor: "8", name: "Typical residential floor", description: "Apartment lines, elevator landing, stairs, risers, and utility closets.", viewpoint: "At the elevator landing looking toward the north stair.", accent: "#a855f7", hotspots: [
+  { id: `${buildingId}-tour-typical`, buildingId, floor: "8", name: "Typical residential floor", description: "Apartment lines, elevator landing, stairs, risers, and utility closets.", viewpoint: "At the elevator landing looking toward the north stair.", accent: "#a855f7", image: TOUR_IMG.floor, hotspots: [
     { id: "riser", label: "Plumbing riser", kind: "equipment", x: 74, y: 48, detail: "Wet-wall riser serving the C and D lines." },
     { id: "stair", label: "North stair", kind: "access", x: 24, y: 38, detail: "Primary service route when the elevator is unavailable." },
   ] },
-  { id: `${buildingId}-tour-roof`, buildingId, floor: "R", name: "Roof and bulkhead", description: "Roof drains, cooling equipment, elevator bulkhead, and facade access.", viewpoint: "At the roof entrance facing north toward the equipment field.", accent: "#22c55e", hotspots: [
+  { id: `${buildingId}-tour-roof`, buildingId, floor: "R", name: "Roof and bulkhead", description: "Roof drains, cooling equipment, elevator bulkhead, and facade access.", viewpoint: "At the roof entrance facing north toward the equipment field.", accent: "#22c55e", image: TOUR_IMG.roof, hotspots: [
     { id: "roof-drains", label: "Primary roof drains", kind: ticketId === "T-4779" ? "issue" : "equipment", x: 26, y: 66, detail: ticketId === "T-4779" ? "Drain-clearing scope linked to T-4779." : "Main north and east drainage points.", relatedTicketId: ticketId === "T-4779" ? ticketId : undefined },
     { id: "bulkhead", label: "Elevator bulkhead", kind: "equipment", x: 70, y: 35, detail: "Controller and overhead machinery access." },
   ] },

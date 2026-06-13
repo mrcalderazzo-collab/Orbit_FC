@@ -137,11 +137,18 @@ Operator app, fully working on seed data:
   - **Vendor:** Dispatches (work awarded to them; confirm window / add photos / upload
     invoice / mark complete — all through OrbitProvider actions), Messages (line to Orbit
     field desk).
-  - **Super (teal):** Today (greeting + role/certs from `supers.ts`, urgent work, who's
-    coming on site), Work (field actions: start / note / photo / mark complete via
-    OrbitProvider → office sees it live), Walkthrough (reuses operator `VirtualWalkthrough`,
-    now exported), Systems & access (plant health + access playbook), Direct Line. Two demo
-    super accounts: Joel Petrov (Vesper House b2) and Walt Friedman (Linden Park b7).
+  - **Super (teal):** a real field tool. **Multi-building** (OrbitUser.buildings[]) with a
+    building switcher + **payroll check-in/out clock** in the shell toolbar (timeclock in
+    OrbitProvider `shifts`/`punchIn`/`punchOut`). Tabs: **Today** (role/certs from `supers.ts`,
+    urgent work, who's coming), **Work** (cards open the full **task detail**: read desc/
+    intake/activity, add field notes + **photos** (`ticketPhotos`/`addTicketPhoto`), guided
+    **close-out checklist** → Awaiting review), **Schedule** (vendor visits + **vendor COI**
+    status + move-ins/outs), **Calendar** (super adds events to the shared **building
+    calendar** `calendar`/`addCalendarEvent`, source "super", optionally spawns a ticket),
+    **Walkthrough** (now **image-backed** tour areas), **Systems** (each card "Report an
+    issue" → prefilled create-ticket), **Direct Line**. Supers **create tickets** via
+    `SuperCreateModal` (manual + optional AI). Demo: Joel Petrov covers b2/b3/b5; Walt
+    Friedman b7. Walkthrough images also show in the operator Buildings 3D tab.
   - **Shared, reused across personas:** `shared/PublicTrackerCard`, `shared/NoticesPanel`,
     `shared/DirectLinePanel` (ChatThread now takes an optional `seed`). Scoping helpers in
     `identity.ts` (`boardVoteTickets`, `boardActivityTickets`, `residentTickets`,

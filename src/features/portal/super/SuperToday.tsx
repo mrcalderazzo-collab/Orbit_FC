@@ -14,17 +14,17 @@ const MONO = "'JetBrains Mono', monospace";
 const TEAL = "#14b8a6";
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export function SuperToday({ go }: { go: (id: string) => void }) {
+export function SuperToday({ buildingId, go, onCreate }: { buildingId: string; go: (id: string) => void; onCreate: () => void }) {
   const { currentUser, tickets } = useOrbit();
-  const b = currentUser?.building ? buildingById(currentUser.building) : undefined;
-  const sup = superByBuilding(currentUser?.building);
-  const work = useMemo(() => (currentUser ? superTickets(currentUser, tickets) : []), [currentUser, tickets]);
+  const b = buildingById(buildingId);
+  const sup = superByBuilding(buildingId);
+  const work = useMemo(() => superTickets(buildingId, tickets), [buildingId, tickets]);
   const active = work.filter((t) => t.status !== "Closed");
   const urgent = active.filter((t) => t.prio === "Critical" || t.prio === "High");
-  const systems = BUILDING_SYSTEMS.filter((s) => s.buildingId === currentUser?.building);
+  const systems = BUILDING_SYSTEMS.filter((s) => s.buildingId === buildingId);
   const riskSystems = systems.filter((s) => s.state === "risk" || s.state === "offline");
-  const visits = SITE_VISITS.filter((v) => v.buildingId === currentUser?.building && v.status !== "Completed");
-  const first = (sup?.name || "there").split(" ")[0];
+  const visits = SITE_VISITS.filter((v) => v.buildingId === buildingId && v.status !== "Completed");
+  const first = (currentUser?.person?.name || sup?.name || "there").split(" ")[0];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -36,11 +36,12 @@ export function SuperToday({ go }: { go: (id: string) => void }) {
         </div>
         <h2 style={{ margin: 0, fontFamily: SANS, fontWeight: 600, fontSize: 23, letterSpacing: "-0.4px", color: "var(--ink)" }}>Welcome back, {first}</h2>
         {sup && <p style={{ margin: "6px 0 0", fontFamily: SANS, fontSize: 13, color: "var(--ink-3)" }}>{sup.shift}</p>}
-        <div style={{ display: "flex", gap: 22, marginTop: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 22, marginTop: 16, flexWrap: "wrap" }}>
           <Quick value={active.length} label="Open jobs" color={active.length ? "var(--ink)" : "#22c55e"} />
           <Quick value={urgent.length} label="Urgent" color={urgent.length ? "#ef4444" : "#22c55e"} />
           <Quick value={riskSystems.length} label="Systems at risk" color={riskSystems.length ? "#ef4444" : "#22c55e"} />
           <Quick value={visits.length} label="Visits ahead" color="var(--ink)" />
+          <Btn primary icon="plus" onClick={onCreate} style={{ marginLeft: "auto" }}>Log a ticket</Btn>
         </div>
       </Glass>
 

@@ -946,6 +946,13 @@ html[data-theme="clear"] {
   color: var(--ink-3);
   font: 9px/1.4 "JetBrains Mono", monospace;
 }
+.tour-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-size: cover;
+  background-position: center;
+}
 .tour-hotspot {
   position: absolute;
   width: 32px;

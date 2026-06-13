@@ -1,12 +1,12 @@
 // Super Systems & Access — the building's plant at a glance plus the access
 // playbook the super owns (keys, entry, vendor escort). Read-only health from
 // BUILDING_SYSTEMS; access notes from the super's record.
-import { useOrbit } from "@/store/OrbitProvider";
 import type { BuildingSystem } from "@/lib/types";
 import { buildingById } from "@/data/seed";
 import { superByBuilding } from "@/data/supers";
 import { BUILDING_SYSTEMS } from "@/data/buildings";
-import { Glass, Icon, SectionLabel, Tag } from "@/components/ui";
+import { Btn, Glass, Icon, SectionLabel, Tag } from "@/components/ui";
+import type { CreatePrefill } from "./SuperCreateModal";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -19,11 +19,10 @@ const STATE: Record<BuildingSystem["state"], { label: string; color: string; ico
 };
 const fmtDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-export function SuperSystems() {
-  const { currentUser } = useOrbit();
-  const b = currentUser?.building ? buildingById(currentUser.building) : undefined;
-  const sup = superByBuilding(currentUser?.building);
-  const systems = BUILDING_SYSTEMS.filter((s) => s.buildingId === currentUser?.building);
+export function SuperSystems({ buildingId, onCreate }: { buildingId: string; onCreate: (prefill: CreatePrefill) => void }) {
+  const b = buildingById(buildingId);
+  const sup = superByBuilding(buildingId);
+  const systems = BUILDING_SYSTEMS.filter((s) => s.buildingId === buildingId);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -58,6 +57,7 @@ export function SuperSystems() {
                 <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}>Vendor · {s.vendor}</span>
                 <span style={{ fontFamily: MONO, fontSize: 9, color: s.state === "risk" ? "#ef4444" : "var(--ink-3)" }}>Next · {fmtDate(s.nextService)}</span>
               </div>
+              <Btn small ghost icon="circle-plus" onClick={() => onCreate({ title: s.name + " — issue", category: "systems", locationLabel: s.location })} style={{ marginTop: 12, width: "100%", justifyContent: "center" }}>Report an issue</Btn>
             </Glass>
           );
         })}

@@ -20,13 +20,14 @@ export interface PortalTab {
 }
 
 export function PortalShell({
-  accent, tabs, active, onSelect, children,
+  accent, tabs, active, onSelect, children, toolbar,
 }: {
   accent: string;
   tabs: PortalTab[];
   active: string;
   onSelect: (id: string) => void;
   children: ReactNode;
+  toolbar?: ReactNode;
 }) {
   const { currentUser } = useOrbit();
   if (!currentUser) return null;
@@ -66,9 +67,12 @@ export function PortalShell({
             </button>
           );
         })}
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8, paddingRight: 4 }}>
-          <Avatar person={p!} size={24} />
-          <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.role}</span>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12, paddingRight: 4 }}>
+          {toolbar}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Avatar person={p!} size={24} />
+            <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.role}</span>
+          </span>
         </span>
       </nav>
 

@@ -151,6 +151,7 @@ export interface BuildingTourArea {
   description: string;
   viewpoint: string;
   accent: string;
+  image?: string;
   hotspots: TourHotspot[];
 }
 
@@ -435,6 +436,9 @@ export interface OrbitUser {
   home?: string;
   perms?: string[];
   building?: string;
+  /** for personas assigned to more than one building (e.g. a super covering a
+   *  cluster). Defaults to [building] when unset. */
+  buildings?: string[];
   unit?: string;
   company?: string;
   person?: Pick<Person, "name" | "initials" | "color" | "role">;

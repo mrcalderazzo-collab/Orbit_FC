@@ -581,6 +581,7 @@ export function VirtualWalkthrough({ areas, files, onTicket }: { areas: Building
             <strong>{area.name}</strong>
             <span>{area.viewpoint}</span>
           </div>
+          {area.image && <div className="tour-photo" style={{ backgroundImage: `linear-gradient(180deg, rgba(8,8,12,0.28), rgba(8,8,12,0.62)), url(${area.image})` }} />}
           {area.hotspots.map((item, index) => (
             <button
               key={item.id}

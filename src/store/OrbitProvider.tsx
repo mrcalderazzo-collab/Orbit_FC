@@ -39,9 +39,24 @@ const SEED_WORK_DATES: Record<string, string> = {
   "T-4801": todayISO(), "T-4795": todayISO(), "T-4779": addDaysISO(1), "T-4790": addDaysISO(2),
 };
 
+// a few building-calendar entries so the super's calendar isn't empty
+const SEED_CALENDAR: BuildingEvent[] = [
+  { id: "cal1", buildingId: "b2", title: "Boiler vendor — annual PM", kind: "Vendor visit", at: addDaysISO(1) + "T09:00", by: "Joel Petrov", source: "super", note: "Northeast Mechanical, cellar — escort required." },
+  { id: "cal2", buildingId: "b2", title: "Move-out — Unit 14C", kind: "Move-out", at: addDaysISO(2) + "T12:00", by: "Joel Petrov", source: "super", note: "Reserve service elevator 12–4." },
+  { id: "cal3", buildingId: "b2", title: "FDNY sprinkler inspection", kind: "Inspection", at: addDaysISO(5) + "T10:00", by: "Priya Anand", source: "office" },
+  { id: "cal4", buildingId: "b3", title: "Roof drain clearing before storm", kind: "Maintenance", at: addDaysISO(1) + "T08:00", by: "Tony Calabrese", source: "super", ticketId: "T-4779" },
+];
+
 export type ThemeName = "dark" | "light" | "clear";
 export type Route = { page: string; id: string | null };
 export type Toast = { msg: string; kind: "ok" | "err"; t: number } | null;
+
+/** payroll time-clock punch (super check-in / check-out) */
+export interface Shift { id: string; userId: string; building: string; in: string; out: string | null }
+/** a building calendar entry — super- or office-added; may link a ticket */
+export interface BuildingEvent { id: string; buildingId: string; title: string; kind: string; at: string; by: string; source: "super" | "office"; note?: string; ticketId?: string }
+/** a photo attached to a ticket from the field */
+export interface TicketPhoto { id: string; url: string; caption: string; by: string; at: string }
 
 let _tid = 4802;
 const nextTicketId = () => "T-" + _tid++;
@@ -98,6 +113,17 @@ interface OrbitState {
   // shared ballots
   ballots: Record<string, Record<string, string>>;
   castBallot: (ticketId: string, memberName: string, bidId: string) => void;
+  // payroll time-clock (super check-in / check-out)
+  shifts: Shift[];
+  activeShift: (userId: string) => Shift | null;
+  punchIn: (building: string) => void;
+  punchOut: () => void;
+  // building calendar (super- / office-added events)
+  calendar: BuildingEvent[];
+  addCalendarEvent: (e: Omit<BuildingEvent, "id" | "by" | "source"> & { by?: string; source?: BuildingEvent["source"] }) => void;
+  // field photos on a ticket
+  ticketPhotos: Record<string, TicketPhoto[]>;
+  addTicketPhoto: (ticketId: string, caption: string) => void;
   // work orders (vendor ↔ ticket ↔ invoice ↔ payment)
   workOrders: Record<string, WorkOrder>;
   ensureWorkOrder: (t: Ticket) => void;
@@ -137,6 +163,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [ticketMessages, setTicketMessages] = useState<Record<string, TicketMessage[]>>({});
   const [ticketProgress, setTicketProgress] = useState<Record<string, { items: ChecklistItem[] }>>({});
   const [ballots, setBallots] = useState<Record<string, Record<string, string>>>({});
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [calendar, setCalendar] = useState<BuildingEvent[]>(() => SEED_CALENDAR.map((e) => ({ ...e })));
+  const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
   const [workOrders, setWorkOrders] = useState<Record<string, WorkOrder>>(() => seedWorkOrders(TICKETS, ticketFlow));
   const [chat, setChat] = useState<Record<string, ChatMessage[]>>({});
   const [commandId, setCommandId] = useState<string | null>(null);
@@ -287,6 +316,36 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
   }, []);
 
+  // ── payroll time-clock ──
+  const activeShift = useCallback((uid: string) => shifts.find((s) => s.userId === uid && !s.out) || null, [shifts]);
+  const punchIn = useCallback((building: string) => {
+    const uid = currentUser?.id;
+    if (!uid) return;
+    setShifts((ss) => (ss.some((s) => s.userId === uid && !s.out) ? ss : [...ss, { id: "sh" + Date.now(), userId: uid, building, in: new Date().toISOString(), out: null }]));
+    notify("Checked in · clock running");
+  }, [currentUser, notify]);
+  const punchOut = useCallback(() => {
+    const uid = currentUser?.id;
+    if (!uid) return;
+    setShifts((ss) => ss.map((s) => (s.userId === uid && !s.out ? { ...s, out: new Date().toISOString() } : s)));
+    notify("Checked out · shift logged");
+  }, [currentUser, notify]);
+
+  // ── building calendar ──
+  const addCalendarEvent = useCallback<OrbitState["addCalendarEvent"]>((e) => {
+    setCalendar((cs) => [...cs, { ...e, id: "cal" + Date.now(), by: e.by ?? userName(currentUser), source: e.source ?? "super" }]);
+    notify("Added to building calendar");
+  }, [currentUser, notify]);
+
+  // ── field photos ──
+  const addTicketPhoto = useCallback((ticketId: string, caption: string) => {
+    const n = (ticketPhotos[ticketId]?.length || 0) + 1;
+    const photo: TicketPhoto = { id: "ph" + Date.now(), url: `https://picsum.photos/seed/${ticketId}-${n}/480/320`, caption: caption || "Field photo " + n, by: userName(currentUser), at: stamp() };
+    setTicketPhotos((s) => ({ ...s, [ticketId]: [...(s[ticketId] || []), photo] }));
+    setTickets((ts) => ts.map((t) => t.id === ticketId ? { ...t, log: [...t.log, logLine(me(), "Photo added · " + photo.caption)] } : t));
+    notify("Photo added to " + ticketId);
+  }, [ticketPhotos, currentUser, me, notify]);
+
   // ── work orders ──
   const ensureWorkOrder = useCallback((t: Ticket) => {
     setWorkOrders((wos) => {
@@ -411,10 +470,13 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     recs, decideRec, addRecs,
     notices, sendNotice,
     ballots, castBallot,
+    shifts, activeShift, punchIn, punchOut,
+    calendar, addCalendarEvent,
+    ticketPhotos, addTicketPhoto,
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }
