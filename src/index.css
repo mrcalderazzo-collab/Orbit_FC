@@ -22,9 +22,9 @@ html[data-theme="dark"] {
   --code-bg: rgba(0, 0, 0, 0.3);
 
   --ink: #ffffff;
-  --ink-2: #a1a1aa;
-  --ink-3: #71717a;
-  --ink-4: #52525b;
+  --ink-2: #b8b8c0;
+  --ink-3: #8e8e98;
+  --ink-4: #6c6c77;
   --ink-5: #3f3f46;
 
   --hair: rgba(255, 255, 255, 0.05);
@@ -50,11 +50,11 @@ html[data-theme="light"] {
   --scrim: rgba(48, 44, 34, 0.42);
   --code-bg: rgba(40, 38, 30, 0.05);
 
-  --ink: #1b1d18;
-  --ink-2: #53564c;
-  --ink-3: #6c6f63;
-  --ink-4: #8b8e82;
-  --ink-5: #c0c1b6;
+  --ink: #16180f;
+  --ink-2: #44473c;
+  --ink-3: #595c4f;
+  --ink-4: #74776a;
+  --ink-5: #b6b7ab;
 
   --hair: rgba(40, 38, 30, 0.08);
   --hair-2: rgba(40, 38, 30, 0.1);
@@ -79,11 +79,11 @@ html[data-theme="clear"] {
   --scrim: rgba(30, 41, 59, 0.4);
   --code-bg: rgba(30, 41, 59, 0.06);
 
-  --ink: #14181f;
-  --ink-2: #475063;
-  --ink-3: #5d6679;
-  --ink-4: #889280;
-  --ink-5: #b3bccb;
+  --ink: #0e1119;
+  --ink-2: #3a4254;
+  --ink-3: #515a6d;
+  --ink-4: #6f788b;
+  --ink-5: #aab3c2;
 
   --hair: rgba(30, 41, 59, 0.08);
   --hair-2: rgba(30, 41, 59, 0.11);

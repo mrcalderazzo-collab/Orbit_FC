@@ -37,7 +37,12 @@ export function Sidebar() {
   };
   return (
     <aside style={{ width: 224, flexShrink: 0, display: "flex", flexDirection: "column", padding: "18px 14px", borderRight: "1px solid var(--hair-2)", background: "var(--sidebar-bg)", backdropFilter: "blur(25px)" }}>
-      <div style={{ padding: "0 6px 18px" }}><OrbitWordmark /></div>
+      <div style={{ padding: "0 6px 14px" }}><OrbitWordmark /></div>
+      <button onClick={() => window.dispatchEvent(new Event("orbit-open-search"))} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "8px 11px", marginBottom: 12, borderRadius: 10, background: "var(--fill-2)", border: "1px solid var(--hair-3)", cursor: "pointer" }}>
+        <Icon name="search" size={14} color="var(--ink-4)" />
+        <span style={{ flex: 1, textAlign: "left", fontFamily: SANS, fontSize: 12, color: "var(--ink-4)" }}>Search…</span>
+        <span style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, color: "var(--ink-4)", border: "1px solid var(--hair-3)", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
+      </button>
       <AccountWidget />
       <nav style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 20, flex: 1, overflowY: "auto" }} className="no-scrollbar">
         {NAV.map((group) => {

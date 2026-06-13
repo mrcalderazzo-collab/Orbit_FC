@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { OrbitProvider, useOrbit } from "@/store/OrbitProvider";
 import { Login } from "@/features/auth/Login";
+import { GlobalSearch } from "@/features/search/GlobalSearch";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Toast } from "@/components/shell/TopBar";
 import { TicketsPage } from "@/features/tickets/TicketsPage";
@@ -43,6 +45,14 @@ function CurrentPage() {
 
 function Shell() {
   const { currentUser, commandId, closeCommand } = useOrbit();
+  const [search, setSearch] = useState(false);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearch((s) => !s); } };
+    const open = () => setSearch(true);
+    window.addEventListener("keydown", h);
+    window.addEventListener("orbit-open-search", open);
+    return () => { window.removeEventListener("keydown", h); window.removeEventListener("orbit-open-search", open); };
+  }, []);
   if (!currentUser) return <Login />;
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
@@ -51,6 +61,7 @@ function Shell() {
         <CurrentPage />
       </main>
       {commandId && <TicketCommand id={commandId} onClose={closeCommand} />}
+      <GlobalSearch open={search} onClose={() => setSearch(false)} />
     </div>
   );
 }

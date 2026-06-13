@@ -10,9 +10,11 @@ import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { TicketBoard, TicketCards, TicketList, TicketQueue } from "./views";
 import { FocusBoard } from "./FocusBoard";
+import { seedMessageList } from "./command/commsSeed";
 import { NewIntakeWizard } from "@/features/intake/NewIntakeWizard";
 
 const MONO = "'JetBrains Mono', monospace";
+const SANS = "Outfit, sans-serif";
 
 const APPROVAL_OPTS = [
   { value: "All", label: "All approvals" },
@@ -23,9 +25,12 @@ const APPROVAL_OPTS = [
 ];
 const VIEWS: [string, string][] = [["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
 
+const PRESETS: [string, string][] = [["all", "All"], ["mine", "My buildings"], ["unowned", "Unowned"], ["sla", "SLA risk"], ["reply", "Awaiting reply"]];
+
 export function TicketsPage() {
-  const { tickets, openCommand } = useOrbit();
+  const { tickets, openCommand, currentUser, ticketMessages } = useOrbit();
   const [q, setQ] = useState("");
+  const [preset, setPreset] = useState("all");
   const [fStatus, setFStatus] = useState("All");
   const [fType, setFType] = useState("All");
   const [fBuilding, setFBuilding] = useState("All");
@@ -46,9 +51,19 @@ export function TicketsPage() {
     return [...set].sort();
   }, [tickets, flowMap]);
 
+  const myWho = currentUser?.persona === "operator" ? currentUser.who : undefined;
+  const needsReply = (t: typeof tickets[number]) => {
+    const f = flowMap[t.id];
+    const msgs = ticketMessages[t.id] || (f ? seedMessageList(t, f) : []);
+    return msgs[msgs.length - 1]?.dir === "in";
+  };
   const filtered = tickets.filter((t) => {
     const f = flowMap[t.id];
     if (t.mergedInto) return false; // duplicates folded into their canonical ticket
+    if (preset === "mine" && !(myWho && BUILDINGS.find((b) => b.id === t.building)?.am === myWho)) return false;
+    if (preset === "unowned" && !(t.status === "Open" && !t.assignee)) return false;
+    if (preset === "sla" && !(f && f.sla.breached && t.status !== "Closed")) return false;
+    if (preset === "reply" && !(t.status !== "Closed" && needsReply(t))) return false;
     if (fStatus !== "All" && t.status !== fStatus) return false;
     if (fType !== "All" && t.type !== fType) return false;
     if (fBuilding !== "All" && t.building !== fBuilding) return false;
@@ -90,6 +105,18 @@ export function TicketsPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 28px", borderBottom: "1px solid var(--hair-2)", flexWrap: "wrap" }}>
+        <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginRight: 4 }}>SAVED VIEWS</span>
+        {PRESETS.map(([k, label]) => {
+          const on = preset === k;
+          return (
+            <button key={k} onClick={() => setPreset(k)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 99, cursor: "pointer", background: on ? "rgba(var(--acc-rgb),0.12)" : "var(--fill-2)", border: "1px solid " + (on ? "rgba(var(--acc-rgb),0.4)" : "var(--hair-3)"), fontFamily: SANS, fontSize: 12, fontWeight: on ? 600 : 500, color: on ? "var(--ink)" : "var(--ink-3)" }}>
+              {on && <Icon name="bookmark-check" size={12} color="var(--acc-text)" />}{label}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>

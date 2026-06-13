@@ -13,6 +13,8 @@ import {
   ATTACH_KINDS, BILLABLE_TO, CATEGORIES, COMMON_AREAS, CONTACT_PREFS, INTAKE_CHANNELS,
   LOCATION_KINDS, SUBMITTER_ROLES, SUGGESTED_TAGS, SYSTEM_OPTIONS, UNIT_LINES, categoryByKey,
 } from "@/data/taxonomy";
+import { aiClassifyIntake } from "@/services/ai";
+import { AISourceBadge } from "@/features/ai/TicketTriagePanel";
 import { Avatar, Btn, Field, Icon, Modal, Select, TextInput, inputStyle } from "@/components/ui";
 
 const SANS = "Outfit, sans-serif";
@@ -135,9 +137,36 @@ export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
 type SetFn = <K extends keyof Form>(k: K, v: Form[K]) => void;
 
 function StepWhat({ f, set, cat, locationLabel }: { f: Form; set: SetFn; cat: ReturnType<typeof categoryByKey>; locationLabel: string }) {
+  const [analyzing, setAnalyzing] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [src, setSrc] = useState<"claude" | "heuristic" | null>(null);
+  const analyze = async () => {
+    if (!f.desc.trim()) return;
+    setAnalyzing(true);
+    try {
+      const r = await aiClassifyIntake(f.desc, BUILDINGS.find((b) => b.id === f.building)?.name);
+      set("category", r.category);
+      const c2 = categoryByKey(r.category);
+      if (r.subcategory && c2) { const m = c2.subs.find((s) => s.toLowerCase().includes(r.subcategory.toLowerCase())); if (m) set("subcategory", m); }
+      set("prio", r.priority);
+      if (!f.title.trim()) set("title", r.title);
+      if (r.category === "emergency") set("emergency", true);
+      setApplied(true); setSrc(r.source);
+    } catch { /* leave manual */ } finally { setAnalyzing(false); }
+  };
   return (
     <div>
-      <Label>Category · this is the tag</Label>
+      <Label>Describe the issue — AI suggests the rest</Label>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
+        <textarea value={f.desc} onChange={(e) => set("desc", e.target.value)} rows={3} placeholder="Type what's going on in plain language — e.g. 'water pouring into the cellar from the north wall, getting worse'. AI picks the category, priority & a title; correct anything." style={{ ...inputStyle, resize: "vertical", fontFamily: SANS, flex: 1 }} autoFocus />
+        <Btn small primary icon={analyzing ? "loader" : "sparkles"} disabled={analyzing || !f.desc.trim()} onClick={analyze} style={{ flexShrink: 0 }}>{analyzing ? "Analyzing…" : "Analyze"}</Btn>
+      </div>
+      {applied && src && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontFamily: MONO, fontSize: 9.5, color: "var(--ink-3)" }}>
+          <AISourceBadge source={src} /><span>suggested below — review &amp; correct anything.</span>
+        </div>
+      )}
+      <Label>{applied ? "Category · AI suggested — correct if needed" : "Category · the tag"}</Label>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
         {CATEGORIES.map((c) => {
           const on = f.category === c.key;
@@ -163,10 +192,7 @@ function StepWhat({ f, set, cat, locationLabel }: { f: Form; set: SetFn; cat: Re
         </div>
       )}
 
-      <Field label="Title"><TextInput value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Water leak under kitchen sink — Unit 4C" autoFocus /></Field>
-      <Field label="Describe the problem — items, details, what's happening">
-        <textarea value={f.desc} onChange={(e) => set("desc", e.target.value)} rows={3} placeholder="What is the problem, when did it start, what's affected…" style={{ ...inputStyle, resize: "vertical", fontFamily: SANS }} />
-      </Field>
+      <Field label="Title"><TextInput value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Water leak under kitchen sink — Unit 4C" /></Field>
 
       {/* location */}
       <Label>Where</Label>

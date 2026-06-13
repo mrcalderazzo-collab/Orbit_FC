@@ -122,6 +122,58 @@ function heuristicTriage(t: TriageInput): Omit<TriageResult, "source" | "model">
   return { type, priority, summary, suggestedOwnerId: ownerId, draftResponse, confidence: 0.62, rationale };
 }
 
+// ── Intake classification (AI-first capture) ────────────────────────────
+const CATEGORY_KEYS = ["maintenance", "facility", "systems", "compliance", "finance", "legal", "documents", "resident", "security", "emergency", "sanitation", "grounds", "capital", "procurement", "moves"];
+export interface IntakeClassifyInput { text: string; buildingName?: string }
+export interface IntakeClassifyResult { source: "claude" | "heuristic"; model?: string; category: string; subcategory: string; priority: string; title: string; summary: string; }
+
+const INTAKE_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    category: { type: "string", enum: CATEGORY_KEYS },
+    subcategory: { type: "string" },
+    priority: { type: "string", enum: PRIOS },
+    title: { type: "string" },
+    summary: { type: "string" },
+  },
+  required: ["category", "subcategory", "priority", "title", "summary"],
+};
+
+export async function classifyIntake(input: IntakeClassifyInput): Promise<IntakeClassifyResult> {
+  const system =
+    "You are Orbit FC's intake classifier. A user describes a property issue in plain language; you suggest how to file it — the operator reviews & corrects. " +
+    "Pick the best `category` from: maintenance, facility (common areas), systems (boiler/elevator/etc), compliance (violations/inspections/local law), finance, legal/governance, documents, resident (concierge), security, emergency (life-safety/active damage), sanitation, grounds, capital (renovations), procurement, moves. " +
+    "Give a short `subcategory`, a `priority` (Critical=life-safety/active damage 4h, High 24h, Normal 72h, Low 120h), a concise `title` (≤9 words), and a one-sentence `summary`. Never invent specifics.";
+  const out = await claudeJSON<Omit<IntakeClassifyResult, "source" | "model">>(system, JSON.stringify(input), INTAKE_SCHEMA);
+  if (out) return { source: "claude", model: out.model, ...out.data };
+  return { source: "heuristic", ...heuristicClassify(input) };
+}
+
+function heuristicClassify(input: IntakeClassifyInput): Omit<IntakeClassifyResult, "source" | "model"> {
+  const text = input.text.toLowerCase();
+  const has = (...w: string[]) => w.some((x) => text.includes(x));
+  let category = "maintenance";
+  if (has("gas", "fire", "smoke", "flood", "pouring", "intrusion", "entrapment", "carbon monoxide", "no heat", "no hot water", "sewage backup", "structural", "evacuat", "burst")) category = "emergency";
+  else if (has("violation", "hpd", "dob", "fdny", "inspection", "facade", "fisp", "ll11", "ll97", "ll152", "permit", "lead", "asbestos")) category = "compliance";
+  else if (has("invoice", "payment", "budget", "assessment", "arrears", "billing", "refund", "anomaly", "reserve")) category = "finance";
+  else if (has("board", "bylaw", "alteration", "sublet", "purchase application", "counsel", "litigation", "contract")) category = "legal";
+  else if (has("insurance", "coi", "lease", "deed", "certificate", "policy", "binder", "warranty")) category = "documents";
+  else if (has("package", "amenity", "noise", "neighbor", "pet", "fob", "concierge", "move-in", "move-out")) category = "resident";
+  else if (has("camera", "cctv", "intercom", "break-in", "theft", "vandal", "alarm", "access control")) category = "security";
+  else if (has("boiler", "elevator", "generator", "switchgear", "sprinkler", "standpipe", "pump", "cooling tower", "fire alarm")) category = "systems";
+  else if (has("trash", "compactor", "pest", "rodent", "roach", "bedbug", "graffiti", "snow", "cleaning")) category = "sanitation";
+  else if (has("lobby", "hallway", "garage", "roof deck", "laundry", "gym", "common", "facade", "sidewalk")) category = "facility";
+  else if (has("garden", "lawn", "tree", "landscap", "irrigation")) category = "grounds";
+
+  let priority = "Normal";
+  if (category === "emergency" || has("urgent", "critical", "emergency", "flood", "no heat", "no hot water", "outage")) priority = "Critical";
+  else if (has("leak", "elevator", "expires", "deadline", "overdue", "lapses")) priority = "High";
+
+  const words = input.text.replace(/\s+/g, " ").trim().split(" ");
+  const title = words.slice(0, 9).join(" ") + (words.length > 9 ? "…" : "");
+  return { category, subcategory: "", priority, title: title || "New request", summary: `${category} request${input.buildingName ? " at " + input.buildingName : ""}: ${input.text.slice(0, 120)}` };
+}
+
 // ── Pattern / predictive ────────────────────────────────────────────────
 const PATTERN_SCHEMA = {
   type: "object", additionalProperties: false,

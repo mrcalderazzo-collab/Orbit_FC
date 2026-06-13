@@ -47,6 +47,20 @@ export function aiPatterns(buildingName: string, tickets: Ticket[]): Promise<Pat
   });
 }
 
+export interface IntakeClassifyResult {
+  source: "claude" | "heuristic";
+  model?: string;
+  category: string;
+  subcategory: string;
+  priority: Priority;
+  title: string;
+  summary: string;
+}
+
+export function aiClassifyIntake(text: string, buildingName?: string): Promise<IntakeClassifyResult> {
+  return post<IntakeClassifyResult>("/api/ai/intake", { text, buildingName });
+}
+
 export function aiVendor(t: Ticket, bids: Bid[]): Promise<VendorResult> {
   return post<VendorResult>("/api/ai/vendor", { title: t.title, type: t.type, bids: bids.map((b) => ({ vendor: b.vendor, amount: b.amount, leadTimeDays: b.leadTimeDays, warrantyMo: b.warrantyMo, grade: b.grade })) });
 }

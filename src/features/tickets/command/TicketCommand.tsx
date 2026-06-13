@@ -5,10 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { moneyFull } from "@/lib/format";
 import { slaState } from "@/lib/ticket";
-import { ticketFlow } from "@/data/flow";
+import { ticketFlow, STAGE_INDEX } from "@/data/flow";
 import { BUILDINGS } from "@/data/seed";
 import { Icon, PrioDot, Tag } from "@/components/ui";
 import { CommsDock } from "@/features/comms/CommsDock";
+import { CloseOutModal } from "./CloseOutModal";
 import { DoDateMenu } from "../DoDateMenu";
 import { SlaChip, StageTracker, TicketStatusMenu } from "./workspaceParts";
 import { Overview } from "./tabs/Overview";
@@ -35,6 +36,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
   const t = tickets.find((x) => x.id === id);
   const [tab, setTab] = useState("overview");
   const [dock, setDock] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -85,6 +87,11 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
               <Icon name="trending-up" size={15} color="#ef4444" />Escalate
             </button>
           )}
+          {t.status !== "Closed" && f.stageIndex >= STAGE_INDEX.review && (
+            <button onClick={() => setClosing(true)} title="Close out — checklist" style={{ display: "flex", alignItems: "center", gap: 6, height: 34, marginTop: 13, padding: "0 13px", borderRadius: 99, border: "1px solid rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.1)", color: "#22c55e", cursor: "pointer", flexShrink: 0, fontFamily: "Outfit, sans-serif", fontSize: 12, fontWeight: 600 }}>
+              <Icon name="shield-check" size={15} color="#22c55e" />Close out
+            </button>
+          )}
           <button onClick={() => setDock((d) => !d)} title="Open communications" style={{ display: "flex", alignItems: "center", gap: 7, height: 34, padding: "0 13px", marginTop: 13, borderRadius: 99, border: "1px solid " + (dock ? "rgba(var(--acc-rgb),0.45)" : "var(--hair-3)"), background: dock ? "rgba(var(--acc-rgb),0.12)" : "var(--fill-2)", cursor: "pointer", flexShrink: 0 }}>
             <Icon name="messages-square" size={16} color={dock ? "var(--acc-text)" : "var(--ink-2)"} />
             <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 600, color: dock ? "var(--ink)" : "var(--ink-2)" }}>Message</span>
@@ -125,6 +132,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
 
         <CommsDock t={t} f={f} open={dock} onClose={() => setDock(false)} />
       </div>
+      {closing && <CloseOutModal t={t} f={f} onClose={() => setClosing(false)} />}
     </div>
   );
 }

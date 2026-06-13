@@ -4,7 +4,7 @@
 // server; this keeps the demo runnable with a single `npm run dev`.
 import type { Connect, Plugin } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { patterns, triage, vendorMatch } from "./aiService";
+import { classifyIntake, patterns, triage, vendorMatch } from "./aiService";
 
 function readJSON(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -25,6 +25,7 @@ const ROUTES: Record<string, (body: never) => Promise<unknown>> = {
   "/api/ai/triage": (b) => triage(b),
   "/api/ai/patterns": (b) => patterns(b),
   "/api/ai/vendor": (b) => vendorMatch(b),
+  "/api/ai/intake": (b) => classifyIntake(b),
 };
 
 function middleware(): Connect.NextHandleFunction {

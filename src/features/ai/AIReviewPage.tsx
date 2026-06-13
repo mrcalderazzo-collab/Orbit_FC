@@ -142,14 +142,18 @@ function RecCard({ r, onOpen, onDecide }: { r: AiRec; onOpen: () => void; onDeci
 }
 
 function RecDetail({ id, onClose }: { id: string; onClose: () => void }) {
-  const { recs, decideRec } = useOrbit();
+  const { recs, decideRec, openCommand } = useOrbit();
   const r = recs.find((x) => x.id === id);
   if (!r) return null;
   const b = BUILDINGS.find((x) => x.id === r.building)!;
   const decided = r.status !== "pending";
   return (
     <Modal open onClose={onClose} width={580} title={r.rec} sub={r.agent + " · " + r.kind + " · " + b.name}
-      footer={!decided ? <><Btn danger icon="x" onClick={() => { decideRec(r.id, "rejected"); onClose(); }}>Reject</Btn><Btn primary icon="check" onClick={() => { decideRec(r.id, "approved"); onClose(); }}>Approve &amp; sign</Btn></> : <Btn ghost onClick={onClose}>Close</Btn>}>
+      footer={<>
+        {r.ticketId && <Btn ghost icon="arrow-up-right" onClick={() => { openCommand(r.ticketId!); onClose(); }}>Open {r.ticketId}</Btn>}
+        <div style={{ flex: 1 }} />
+        {!decided ? <><Btn danger icon="x" onClick={() => { decideRec(r.id, "rejected"); onClose(); }}>Reject</Btn><Btn primary icon="check" onClick={() => { decideRec(r.id, "approved"); onClose(); }}>Approve &amp; sign</Btn></> : <Btn ghost onClick={onClose}>Close</Btn>}
+      </>}>
       <SectionLabel style={{ marginBottom: 8 }}>Reasoning</SectionLabel>
       <p style={{ fontFamily: SANS, fontSize: 14, color: "var(--ink-2)", lineHeight: 1.6, margin: "0 0 18px" }}>{r.reason}</p>
       <SectionLabel style={{ marginBottom: 8 }}>Source input</SectionLabel>
