@@ -103,6 +103,25 @@ Sign in with any demo account (the login screen lists them by persona). Operator
 land in the command app; external personas get a portal placeholder. Use the
 account menu to switch users or **View as** an external persona.
 
+## Deploy a private preview (Vercel)
+
+The repo is Vercel-ready (`vercel.json` + serverless functions in `api/ai/*`
+wrapping the same AI service). Deploys are **link-only** by default (unguessable
+URL, not indexed); enable Password / Deployment Protection in project settings
+to lock it to people you share with.
+
+1. [vercel.com/new](https://vercel.com/new) → Import `mrcalderazzo-collab/orbit_fc`.
+2. Branch: `claude/affectionate-tesla-4jxrcd`. Framework auto-detects as Vite;
+   build `npm run build`, output `dist`. Deploy.
+3. (Optional) add `ANTHROPIC_API_KEY` env var for live Claude triage — without
+   it the heuristic fallback runs. Set `ORBIT_AI_MODEL=claude-sonnet-4-6` for
+   cheaper triage.
+4. (Optional, private) Project → Settings → Deployment Protection → Password.
+
+Netlify works the same way (build `npm run build`, publish `dist`) but the
+`/api/ai/*` functions would need Netlify's function format; Vercel runs them
+as-is.
+
 ## Status
 
 First slice (operator Ticket Command + Communications) is built and runnable.
