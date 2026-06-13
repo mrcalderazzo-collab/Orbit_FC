@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import type { Channel } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ticketFlow } from "@/data/flow";
-import { portfolioChannels, seedChatFor } from "@/data/comms";
+import { advisoryChannel, portfolioChannels, seedChatFor } from "@/data/comms";
 import { BUILDINGS } from "@/data/seed";
 import { Icon, inputStyle, Select, Empty } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
@@ -16,10 +16,17 @@ const MONO = "'JetBrains Mono', monospace";
 
 export function CommsPage() {
   const { tickets, chat } = useOrbit();
-  const channels = useMemo(() => portfolioChannels(tickets, ticketFlow), [tickets]);
+  const base = useMemo(() => portfolioChannels(tickets, ticketFlow), [tickets]);
+  const [extra, setExtra] = useState<Channel[]>([]);
+  const channels = useMemo(() => [...base, ...extra.filter((e) => !base.some((b) => b.id === e.id))], [base, extra]);
   const [q, setQ] = useState("");
   const [fb, setFb] = useState("All");
-  const [sel, setSel] = useState<string | null>(channels[0]?.id ?? null);
+  const [sel, setSel] = useState<string | null>(base[0]?.id ?? null);
+  const reroute = (buildingId: string, pos: string) => {
+    const c = advisoryChannel(buildingId, pos);
+    setExtra((e) => (e.some((x) => x.id === c.id) ? e : [...e, c]));
+    setSel(c.id);
+  };
 
   const preview = (c: Channel) => {
     const msgs = chat[c.id] || seedChatFor(c);
@@ -75,7 +82,7 @@ export function CommsPage() {
         </div>
         {/* active thread */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {active ? <ChatThread key={active.id} channel={active} /> : (
+          {active ? <ChatThread key={active.id} channel={active} onRoute={(pos) => reroute(active.buildingId, pos)} /> : (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Empty label="Select a conversation" icon="messages-square" /></div>
           )}
         </div>

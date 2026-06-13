@@ -26,8 +26,14 @@ import type {
   TicketMessage,
 } from "@/lib/types";
 import { stamp } from "@/lib/format";
+import { addDaysISO, todayISO } from "@/lib/focus";
 import { AI_RECS, PEOPLE, TICKETS } from "@/data/seed";
 import { userById, userName } from "@/data/identity";
+
+// a few do-dates so the Focus board has content on first load
+const SEED_WORK_DATES: Record<string, string> = {
+  "T-4801": todayISO(), "T-4795": todayISO(), "T-4779": addDaysISO(1), "T-4790": addDaysISO(2),
+};
 
 export type ThemeName = "dark" | "light" | "clear";
 export type Route = { page: string; id: string | null };
@@ -54,6 +60,8 @@ interface OrbitState {
   setTicketStatus: (id: string, status: Ticket["status"]) => void;
   addTicketNote: (id: string, text: string) => void;
   updateTicket: (id: string, patch: Partial<Ticket>, note?: string) => void;
+  /** set the operator's personal "do date" (ClickUp-style), or null to clear */
+  setWorkDate: (id: string, date: string | null) => void;
   // ticket relationships
   spawnChildTicket: (parentId: string, data: { title: string; type?: Ticket["type"]; prio?: Ticket["prio"] }) => string;
   linkTickets: (aId: string, bId: string) => void;
@@ -106,7 +114,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>(() => {
     try { return (localStorage.getItem("orbit_theme") as ThemeName) || "dark"; } catch { return "dark"; }
   });
-  const [tickets, setTickets] = useState<Ticket[]>(() => TICKETS.map((t) => ({ ...t })));
+  const [tickets, setTickets] = useState<Ticket[]>(() => TICKETS.map((t) => ({ ...t, workDate: SEED_WORK_DATES[t.id] ?? null })));
   const [recs, setRecs] = useState<AiRec[]>(() => AI_RECS.map((r) => ({ ...r })));
   const [ticketComments, setTicketComments] = useState<Record<string, TicketComment[]>>({});
   const [ticketMessages, setTicketMessages] = useState<Record<string, TicketMessage[]>>({});
@@ -191,6 +199,10 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const updateTicket = useCallback<OrbitState["updateTicket"]>((id, patch, note) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, ...patch, log: note ? [...t.log, logLine(me(), note)] : t.log } : t));
   }, [me]);
+
+  const setWorkDate = useCallback((id: string, date: string | null) => {
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, workDate: date } : t));
+  }, []);
 
   const seedComments = useCallback((tid: string, list: TicketComment[]) => {
     setTicketComments((s) => (s[tid] ? s : { ...s, [tid]: list }));
@@ -307,7 +319,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
     theme, setTheme,
-    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket,
+    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate,
     spawnChildTicket, linkTickets, mergeTickets,
     commandId, openCommand, closeCommand,
     ticketComments, seedComments, addComment,
@@ -317,7 +329,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     ballots, castBallot,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

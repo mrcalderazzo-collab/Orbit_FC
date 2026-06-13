@@ -146,6 +146,9 @@ export interface Ticket {
   tags?: string[];
   /** full captured intake from the New Intake flow */
   intake?: TicketIntakeDetail;
+  /** operator's personal "do date" (when they plan to work it) — ClickUp-style,
+   *  distinct from the SLA / predicted-completion. ISO date or null. */
+  workDate?: string | null;
 }
 
 export interface Bid {
@@ -294,7 +297,7 @@ export interface ChecklistItem {
 }
 
 // ── Live chat (Communications) ──────────────────────────────────────────
-export type ChannelKind = "resident" | "board" | "boardDirect" | "team" | "vendor";
+export type ChannelKind = "resident" | "board" | "boardDirect" | "team" | "vendor" | "advisory";
 export type CommVia = "SMS" | "Email" | "In-app";
 
 export interface Participant {
@@ -316,6 +319,8 @@ export interface Channel {
   participants: Participant[];
   defaultVia: CommVia;
   vias: CommVia[];
+  /** advisory "direct line" channels: which Orbit position the board reached */
+  routedTo?: { position: string; positionKey: string; personId: string; personName: string };
 }
 
 export interface ChatMessage {

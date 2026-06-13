@@ -8,6 +8,7 @@ import { ticketFlow } from "@/data/flow";
 import { BUILDINGS } from "@/data/seed";
 import { Icon, PrioDot, Tag } from "@/components/ui";
 import { CommsDock } from "@/features/comms/CommsDock";
+import { DoDateMenu } from "../DoDateMenu";
 import { SlaChip, StageTracker, TicketStatusMenu } from "./workspaceParts";
 import { Overview } from "./tabs/Overview";
 import { Intake } from "./tabs/Intake";
@@ -76,6 +77,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
             </div>
           </div>
           <TicketStatusMenu t={t} />
+          <div><div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>DO DATE</div><DoDateMenu id={t.id} date={t.workDate} compact /></div>
           <SlaChip f={f} />
           <button onClick={() => setDock((d) => !d)} title="Open communications" style={{ display: "flex", alignItems: "center", gap: 7, height: 34, padding: "0 13px", marginTop: 13, borderRadius: 99, border: "1px solid " + (dock ? "rgba(var(--acc-rgb),0.45)" : "var(--hair-3)"), background: dock ? "rgba(var(--acc-rgb),0.12)" : "var(--fill-2)", cursor: "pointer", flexShrink: 0 }}>
             <Icon name="messages-square" size={16} color={dock ? "var(--acc-text)" : "var(--ink-2)"} />

@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Channel, CommVia, Participant } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { userPerson } from "@/data/identity";
-import { seedChatFor } from "@/data/comms";
-import { Icon } from "@/components/ui";
+import { buildingTeam, seedChatFor } from "@/data/comms";
+import { PEOPLE } from "@/data/seed";
+import { Avatar, Icon } from "@/components/ui";
 import { PhoneBubble, PhoneFrame } from "./PhoneFrame";
 
 const SANS = "Outfit, sans-serif";
@@ -15,7 +16,7 @@ const MONO = "'JetBrains Mono', monospace";
 
 const VIA_ICON: Record<CommVia, string> = { SMS: "message-square", Email: "mail", "In-app": "messages-square" };
 
-export function ChatThread({ channel }: { channel: Channel }) {
+export function ChatThread({ channel, onRoute }: { channel: Channel; onRoute?: (positionKey: string) => void }) {
   const { chat, seedChat, sendChat, currentUser } = useOrbit();
   useEffect(() => { seedChat(channel.id, seedChatFor(channel)); }, [channel.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const msgs = chat[channel.id] || [];
@@ -27,6 +28,7 @@ export function ChatThread({ channel }: { channel: Channel }) {
   const [phone, setPhone] = useState(channel.defaultVia === "SMS");
   const [text, setText] = useState("");
   const [toAll, setToAll] = useState(channel.kind === "board");
+  const [routeOpen, setRouteOpen] = useState(false);
   useEffect(() => { setVia(channel.defaultVia); setPhone(channel.defaultVia === "SMS"); setToAll(channel.kind === "board"); }, [channel.id, channel.defaultVia, channel.kind]);
 
   const resolve = (id: string): Participant => (id === "me" ? me : channel.participants.find((p) => p.id === id) || { id, name: id, initials: id.slice(0, 2).toUpperCase(), color: "var(--ink-3)", role: "", kind: "resident" });
@@ -75,6 +77,43 @@ export function ChatThread({ channel }: { channel: Channel }) {
           </button>
         )}
       </div>
+
+      {/* direct-line routing bar (advisory channels) */}
+      {channel.routedTo && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", borderBottom: "1px solid var(--hair-2)", background: "rgba(var(--acc-rgb),0.04)", flexShrink: 0, position: "relative" }}>
+          <Icon name="git-fork" size={13} color="var(--acc-text)" />
+          <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: "var(--ink-4)", textTransform: "uppercase" }}>Direct line to</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <Avatar person={PEOPLE[channel.routedTo.personId]} size={20} />
+            <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{channel.routedTo.personName}</span>
+            <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--acc-text)" }}>· {channel.routedTo.position}</span>
+          </span>
+          {onRoute && (
+            <button onClick={() => setRouteOpen((o) => !o)} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99, cursor: "pointer", background: "var(--fill-2)", border: "1px solid var(--hair-3)", color: "var(--ink-2)", fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>
+              <Icon name="repeat" size={11} color="var(--ink-3)" />REROUTE
+            </button>
+          )}
+          {routeOpen && onRoute && (
+            <div style={{ position: "absolute", top: "calc(100% - 2px)", right: 16, zIndex: 40, minWidth: 220, padding: 6, borderRadius: 12, background: "var(--panel-solid)", border: "1px solid var(--hair-strong)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", padding: "6px 8px" }}>ROUTE TO POSITION</div>
+              {buildingTeam(channel.buildingId).map((t) => {
+                const on = t.key === channel.routedTo!.positionKey;
+                return (
+                  <button key={t.key} onClick={() => { onRoute(t.key); setRouteOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: 8, borderRadius: 9, border: "none", cursor: "pointer", background: on ? "rgba(var(--acc-rgb),0.08)" : "transparent", textAlign: "left" }}
+                    onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = "var(--fill-2)"; }} onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                    <Avatar person={t.person} size={22} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink)" }}>{t.person.name}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{t.label}</div>
+                    </div>
+                    {on && <Icon name="check" size={13} color="var(--acc-text)" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* participants bar for groups */}
       {channel.participants.length > 1 && (

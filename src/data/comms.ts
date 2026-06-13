@@ -4,7 +4,27 @@
 // here describe the counterparties.
 import type { Channel, ChatMessage, CommVia, Participant, Ticket, TicketFlow } from "@/lib/types";
 import { dateShift, rng, seed } from "@/lib/format";
-import { BUILDINGS, ROSTER, buildingById } from "./seed";
+import { BUILDINGS, PEOPLE, ROSTER, buildingById } from "./seed";
+
+// ── Orbit account team / contactable positions ──────────────────────────
+// A building's residents & board can reach any of these positions directly
+// ("Chat with my property manager"). The Account Manager is per-building
+// (building.am); the rest are fixed roles. New positions can be added here.
+export const ACCOUNT_POSITIONS: { key: string; label: string; personId: string | null }[] = [
+  { key: "pm", label: "Property Manager", personId: "nick" },
+  { key: "am", label: "Account Manager", personId: null }, // resolved from building.am
+  { key: "coord", label: "Account Coordinator", personId: "coord" },
+  { key: "compliance", label: "Compliance & Admin", personId: "cait" },
+  { key: "field", label: "Field Intelligence", personId: "luke" },
+];
+
+export function buildingTeam(buildingId: string) {
+  const b = buildingById(buildingId);
+  return ACCOUNT_POSITIONS.map((p) => {
+    const pid = p.key === "am" ? b?.am || "gidi" : p.personId!;
+    return { key: p.key, label: p.label, person: PEOPLE[pid] };
+  });
+}
 
 const BOARD_PALETTE = ["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#d8b4fe"];
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -61,6 +81,29 @@ export function channelsForTicket(t: Ticket, f: TicketFlow): Channel[] {
   return out;
 }
 
+/** a "direct line" channel: the building's board reaching a specific Orbit
+ *  position (Property Manager / Account Manager / …). Deterministic id per
+ *  building + position so the position switcher can swap cleanly. */
+export function advisoryChannel(buildingId: string, positionKey: string): Channel {
+  const b = buildingById(buildingId)!;
+  const team = buildingTeam(buildingId);
+  const pos = team.find((t) => t.key === positionKey) || team[1];
+  const board = boardParticipants(buildingId);
+  const contact: Participant = board[0] || { id: "board_" + buildingId, name: b.name + " Board", initials: "BD", color: "#a855f7", role: "Board", kind: "board" };
+  return ch(
+    {
+      id: "ch_adv_" + buildingId + "_" + pos.key,
+      kind: "advisory", buildingId,
+      title: contact.name,
+      subtitle: "Direct line · " + pos.label,
+      participants: [contact],
+      defaultVia: "In-app",
+      routedTo: { position: pos.label, positionKey: pos.key, personId: pos.person.id, personName: pos.person.name },
+    },
+    ["In-app", "Email", "SMS"],
+  );
+}
+
 /** a single board-member DM channel */
 export function boardDirectChannel(buildingId: string, member: Participant): Channel {
   return ch({ id: "ch_bd_" + buildingId + "_" + slug(member.name), kind: "boardDirect", buildingId, title: member.name, subtitle: member.role, participants: [member], defaultVia: "In-app" }, ["In-app", "Email", "SMS"]);
@@ -70,6 +113,12 @@ export function boardDirectChannel(buildingId: string, member: Participant): Cha
  *  from active tickets, newest first. */
 export function portfolioChannels(tickets: Ticket[], flowOf: (t: Ticket) => TicketFlow): Channel[] {
   const map = new Map<string, Channel>();
+  // direct lines: each building's board → its Account Manager (the headline
+  // "chat with your property manager" relationship)
+  for (const b of BUILDINGS) {
+    const c = advisoryChannel(b.id, "am");
+    map.set(c.id, c);
+  }
   for (const b of BUILDINGS) {
     const board = boardParticipants(b.id);
     if (board.length) {
@@ -113,6 +162,19 @@ export function seedChatFor(channel: Channel): ChatMessage[] {
     if (b) out.push(mk(channel.id, b.id, "In-app", "Agreed — let's get it on the agenda. Can we award by Friday?", d(1, 3)));
     out.push(mk(channel.id, "me", "In-app", "Yes — quorum's almost there. I'll confirm the award the moment it lands.", d(0, 1), true));
     return out;
+  }
+  if (channel.kind === "advisory") {
+    const contact = channel.participants[0];
+    const mgr = (channel.routedTo?.personName || "your manager").split(" ")[0];
+    const topics = [
+      "the reserve study timeline", "next month's board agenda", "the facade (LL11) filing status",
+      "the elevator modernization budget", "our insurance renewal", "the Q2 financials",
+    ];
+    const topic = topics[Math.abs(seed(channel.id)) % topics.length];
+    return [
+      mk(channel.id, "me", "In-app", `Hi — you've got a direct line to me here anytime. Happy to help.`, d(2, 1)),
+      mk(channel.id, contact.id, "In-app", `Thanks ${mgr}. The board wanted to check in on ${topic} — could you give us a quick read when you have a moment?`, d(0, 2)),
+    ];
   }
   if (channel.kind === "boardDirect") {
     const m = channel.participants[0];

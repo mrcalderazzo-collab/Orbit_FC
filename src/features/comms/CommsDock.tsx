@@ -4,20 +4,20 @@
 // or the awarded vendor. No scrim — the ticket stays interactive behind it.
 import { useMemo, useState } from "react";
 import type { Channel, Ticket, TicketFlow } from "@/lib/types";
-import { boardDirectChannel, boardParticipants, channelsForTicket } from "@/data/comms";
+import { advisoryChannel, boardDirectChannel, boardParticipants, channelsForTicket } from "@/data/comms";
 import { Icon } from "@/components/ui";
 import { ChatThread } from "./ChatThread";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
-const KIND_ICON: Record<string, string> = { resident: "home", board: "users", vendor: "hard-hat", boardDirect: "user" };
+const KIND_ICON: Record<string, string> = { resident: "home", board: "users", vendor: "hard-hat", boardDirect: "user", advisory: "git-fork" };
 
 export function CommsDock({ t, f, open, onClose }: { t: Ticket; f: TicketFlow; open: boolean; onClose: () => void }) {
-  const channels = useMemo(() => channelsForTicket(t, f), [t.id, f.stage]); // eslint-disable-line react-hooks/exhaustive-deps
+  const channels = useMemo(() => [...channelsForTicket(t, f), advisoryChannel(t.building, "am")], [t.id, f.stage]); // eslint-disable-line react-hooks/exhaustive-deps
   const directors = useMemo(() => boardParticipants(t.building), [t.building]);
   const [extra, setExtra] = useState<Channel[]>([]);
-  const all = [...channels, ...extra];
+  const all = [...channels, ...extra.filter((e) => !channels.some((c) => c.id === e.id))];
   const [sel, setSel] = useState(channels[0]?.id);
   const [pickDir, setPickDir] = useState(false);
   const active = all.find((c) => c.id === sel) || all[0];
@@ -28,6 +28,11 @@ export function CommsDock({ t, f, open, onClose }: { t: Ticket; f: TicketFlow; o
     setExtra((e) => (e.some((x) => x.id === c.id) ? e : [...e, c]));
     setSel(c.id);
     setPickDir(false);
+  };
+  const reroute = (pos: string) => {
+    const c = advisoryChannel(t.building, pos);
+    setExtra((e) => (e.some((x) => x.id === c.id) ? e : [...e, c]));
+    setSel(c.id);
   };
 
   return (
@@ -55,7 +60,7 @@ export function CommsDock({ t, f, open, onClose }: { t: Ticket; f: TicketFlow; o
           return (
             <button key={c.id} onClick={() => setSel(c.id)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 99, cursor: "pointer", background: on ? "rgba(var(--acc-rgb),0.12)" : "var(--fill-2)", border: "1px solid " + (on ? "rgba(var(--acc-rgb),0.4)" : "var(--hair-3)") }}>
               <Icon name={KIND_ICON[c.kind] || "message-square"} size={13} color={on ? "var(--acc-text)" : "var(--ink-3)"} />
-              <span style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 600, color: on ? "var(--ink)" : "var(--ink-2)" }}>{c.kind === "resident" ? "Resident" : c.kind === "board" ? "Board" : c.kind === "vendor" ? "Vendor" : c.title.split(" ")[0]}</span>
+              <span style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 600, color: on ? "var(--ink)" : "var(--ink-2)" }}>{c.kind === "resident" ? "Resident" : c.kind === "board" ? "Board" : c.kind === "vendor" ? "Vendor" : c.kind === "advisory" ? "Direct line" : c.title.split(" ")[0]}</span>
             </button>
           );
         })}
@@ -82,7 +87,7 @@ export function CommsDock({ t, f, open, onClose }: { t: Ticket; f: TicketFlow; o
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>{active && <ChatThread key={active.id} channel={active} />}</div>
+      <div style={{ flex: 1, minHeight: 0 }}>{active && <ChatThread key={active.id} channel={active} onRoute={active.routedTo ? reroute : undefined} />}</div>
     </div>
   );
 }

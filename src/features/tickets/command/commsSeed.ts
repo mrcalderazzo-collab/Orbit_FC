@@ -38,5 +38,11 @@ export function seedMessageList(t: Ticket, f: TicketFlow): TicketMessage[] {
     out.push({ id: "ms" + i, dir: "out", audience: u.stage === "vote" ? "Board" : "Resident", channels: both ? ["SMS", "Email"] : ["SMS"], text: u.text, by: owner, at: u.ts.replace("T", " "), auto: i < f.updates.length - 1 });
   });
   if (out.length) out.splice(1, 0, { id: "mr", dir: "in", from: f.intake.submitterName, channels: ["SMS"], text: residentReplyText(t), at: out[0].at });
+  // for a deterministic subset (work in flight), the resident's latest message
+  // is waiting on a reply — drives the "Response required" work bucket.
+  if (out.length && t.status !== "Closed" && Math.abs(seed(t.id + "await")) % 3 === 0) {
+    const awaiting = ["Just checking in — any update on this? Thanks!", "Hi — is someone still coming out for this? Want to make sure I'm home.", "Following up — has the vendor been scheduled yet?"];
+    out.push({ id: "mr2", dir: "in", from: f.intake.submitterName, channels: ["SMS"], text: awaiting[Math.abs(seed(t.id + "await2")) % awaiting.length], at: out[out.length - 1].at });
+  }
   return out;
 }

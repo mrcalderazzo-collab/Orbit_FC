@@ -9,6 +9,7 @@ import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
 import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { TicketBoard, TicketCards, TicketList, TicketQueue } from "./views";
+import { FocusBoard } from "./FocusBoard";
 import { NewIntakeWizard } from "@/features/intake/NewIntakeWizard";
 
 const MONO = "'JetBrains Mono', monospace";
@@ -20,7 +21,7 @@ const APPROVAL_OPTS = [
   { value: "review", label: "Awaiting review" },
   { value: "pm", label: "PM authority" },
 ];
-const VIEWS: [string, string][] = [["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
+const VIEWS: [string, string][] = [["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
 
 export function TicketsPage() {
   const { tickets, openCommand } = useOrbit();
@@ -92,6 +93,7 @@ export function TicketsPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>
+        {view === "focus" && <FocusBoard tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
         {view === "queue" && <TicketQueue tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
         {view === "list" && <TicketList tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
         {view === "cards" && <TicketCards tickets={filtered} onOpen={openCommand} />}
