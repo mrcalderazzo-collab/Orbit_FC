@@ -63,7 +63,8 @@ src/
   services/   ai.ts (client wrappers → /api/ai/*)
   features/   dashboard/ (Command Deck) · tickets/ (queue + command/ workspace + tabs)
               comms/ · ai/ · intake/ · vendors/ · notices/ · finance/ · buildings/ · search/
-              portal/ (external personas: shell + board Vote Center/Activity/Finances/Direct Line/Notices)
+              portal/ (external personas) — shell + shared/ (PublicTrackerCard, NoticesPanel,
+                DirectLinePanel) + board/ + resident/ + vendor/
 server/       aiService.ts (Claude + heuristic) · apiPlugin.ts (Vite middleware)
 api/ai/       triage.ts · patterns.ts · vendor.ts · intake.ts (Vercel serverless)
 ```
@@ -112,15 +113,23 @@ Operator app, fully working on seed data:
 - **Personas/impersonation**: operator/board/resident/vendor; "View as" in account widget.
 - **External portal** (`features/portal/`): one persona-tinted shell (board purple /
   resident blue / vendor amber) with a scoped tab bar + account menu (return to Orbit
-  team / sign out), rendered full-screen for any non-operator (see `App.tsx`). **Board
-  portal is live**: **Vote Center** (directors cast ballots via the shared `castBallot`
-  store → appear live in the operator's Bids & Vote tab; live tally + quorum + roster),
-  **Activity** (their building only, rendered from the *public* tracker — no internal
-  log/cost/vendor), **Finances & compliance** (their building's books + compliance
-  register), **Direct Line** (reuses `ChatThread` to the building's AM), **Notices**
-  (scoped, read-only). Resident/vendor land on a tasteful "coming online" surface.
-  Scoping helpers live in `identity.ts` (`boardVoteTickets`, `boardActivityTickets`,
-  `scopedNotices`, `boardTickets`).
+  team / sign out), rendered full-screen for any non-operator (see `App.tsx`). **All three
+  portals are live:**
+  - **Board:** Vote Center (directors cast ballots via the shared `castBallot` store →
+    appear live in the operator's Bids & Vote tab; live tally + quorum + roster), Activity
+    (their building only, public tracker), Finances & compliance, Direct Line, Notices.
+  - **Resident:** My Requests (public tracker, scoped to their unit), Submit Request
+    (AI-first via `aiClassifyIntake` → `createTicket` seam, tagged `_residentOwner`),
+    Notices, My Manager (Direct Line to AM), Statements (deterministic unit ledger).
+  - **Vendor:** Dispatches (work awarded to them; confirm window / add photos / upload
+    invoice / mark complete — all through OrbitProvider actions), Messages (line to Orbit
+    field desk).
+  - **Shared, reused across personas:** `shared/PublicTrackerCard`, `shared/NoticesPanel`,
+    `shared/DirectLinePanel` (ChatThread now takes an optional `seed`). Scoping helpers in
+    `identity.ts` (`boardVoteTickets`, `boardActivityTickets`, `residentTickets`,
+    `vendorTickets`, `scopedNotices`). Seed adds two Northeast Mechanical dispatches
+    (T-4796 closed / T-4797 active) so the vendor portal has live work. No persona ever
+    sees internal cost/vendor/notes for work that isn't theirs.
 
 ---
 
@@ -147,20 +156,16 @@ and the live Claude AI layer (already structured; just set `ANTHROPIC_API_KEY`).
 ---
 
 ## 8. What's NEXT (priority order)
-1. **External portals** (the current milestone — *board portal shipped*).
-   - ✅ **Done:** portal shell (one shell, persona accent, scoped tabs, account menu) +
-     **Board portal** (Vote Center, Activity, Finances/compliance, Direct Line, Notices).
-     Driven off persona routing in `App.tsx` + scoped selectors in `identity.ts`.
-   - Reuse, don't rebuild (still applies to the remaining personas): public Uber-style
-     tracker, ChatThread (direct-line AM), Bids/Vote cards + **shared ballot store**,
-     building snapshot (`buildings.ts`), Notices, AI-first intake.
-   - **Super (next):** their building's open work · site visits + 3D walkthrough/access map ·
+1. **External portals** — ✅ **shipped** (board, resident, vendor). Shell + persona routing
+   in `App.tsx`, scoped selectors in `identity.ts`. Remaining polish/extensions:
+   - **Super portal** (no `super` persona/account yet — would need adding to `USERS` +
+     `PERSONA_META`): their building's open work · site visits + 3D walkthrough/access map ·
      update status / add photos from the field · vendor access.
-   - **Resident (next):** submit request (AI-first) · track my requests (public tracker) ·
-     notices · amenities · chat with my AM · statements. (Resident/vendor currently show a
-     "coming online" surface inside the shell.)
-   - **Scoping is non-negotiable:** each persona sees only their building/unit; never leak
-     internal cost/vendor/notes (the public tracker + scoped selectors enforce this).
+   - **Resident extras not yet built:** amenity booking, attachments on Submit Request,
+     real statement PDF/pay action.
+   - **Vendor extras:** real file upload (photos/invoice currently log a note), COI status.
+   - **Scoping is non-negotiable:** each persona sees only their building/unit/jobs; never
+     leak internal cost/vendor/notes (public tracker + scoped selectors enforce this).
 2. **Make Buildings operational:** wire actions — log/schedule a site visit, "create work
    ticket" from a failing system, upload a file/photo, schedule service (currently read-only).
 3. **Emergency Desk** (spec): pulse tiles, response-log timeline, 3-step intake wizard that

@@ -57,6 +57,37 @@ export function boardActivityTickets(u: OrbitUser, tickets: Ticket[]): Ticket[] 
     .sort((a, b) => (b.created || "").localeCompare(a.created || ""));
 }
 
+/** A resident's own requests: tickets in their building tied to their unit (by
+ *  explicit owner marker, captured intake unit, or the requester label), newest
+ *  first, duplicates folded out. */
+export function residentTickets(u: OrbitUser, tickets: Ticket[]): Ticket[] {
+  const unit = (u.unit || "").toLowerCase();
+  return tickets
+    .filter((t) => {
+      if (t.building !== u.building || t.mergedInto) return false;
+      if (t._residentOwner === u.id) return true;
+      if (!unit) return false;
+      if ((t.intake?.location?.unit || "").toLowerCase() === unit) return true;
+      return new RegExp("(unit|apt|#)\\s*" + unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(t.requester);
+    })
+    .sort((a, b) => (b.created || "").localeCompare(a.created || ""));
+}
+
+/** A vendor's dispatched work: tickets across the portfolio where this vendor is
+ *  named on the ticket or won the bid. Matched loosely on company name so the
+ *  awarded vendor and the canonical ticket vendor both resolve. */
+export function vendorTickets(u: OrbitUser, tickets: Ticket[], flowOf: (t: Ticket) => TicketFlow): Ticket[] {
+  const co = (u.company || "").toLowerCase();
+  if (!co) return [];
+  return tickets
+    .filter((t) => {
+      if (t.mergedInto) return false;
+      if ((t.vendor || "").toLowerCase() === co) return true;
+      return (flowOf(t).awarded?.vendor || "").toLowerCase() === co;
+    })
+    .sort((a, b) => (b.created || "").localeCompare(a.created || ""));
+}
+
 /** Notices visible to a board/resident: their building's broadcasts plus any
  *  portfolio-wide ("all") notice, most recent first. Drafts stay internal. */
 export function scopedNotices(u: OrbitUser | null, notices: Notice[]): Notice[] {

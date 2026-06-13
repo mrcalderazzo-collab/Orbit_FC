@@ -1,6 +1,6 @@
-// Board Notices — building broadcasts the board can see (their building + any
-// portfolio-wide notice). Read-only and scoped via scopedNotices; drafts stay
-// internal to the operator.
+// NoticesPanel — building broadcasts an external persona can see (their building
+// + any portfolio-wide notice). Read-only and scoped via scopedNotices; drafts
+// stay internal. Shared by the board and resident portals.
 import { useMemo } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { scopedNotices } from "@/data/identity";
@@ -10,7 +10,7 @@ import { Glass, Icon, Tag } from "@/components/ui";
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
-export function BoardNotices() {
+export function NoticesPanel() {
   const { currentUser, notices } = useOrbit();
   const building = currentUser?.building ? buildingById(currentUser.building) : undefined;
   const items = useMemo(() => scopedNotices(currentUser, notices), [currentUser, notices]);

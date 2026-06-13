@@ -1,30 +1,40 @@
 // Portal — external-persona entry point. Picks the persona's accent + scoped
-// tab set and renders the active page inside PortalShell. Board is fully wired
-// (Vote Center, Activity, Finances, Direct Line, Notices); resident & vendor
-// land on a tasteful "coming online" surface until their slices ship.
+// tab set and renders the active page inside PortalShell. Board, resident, and
+// vendor are all wired; each persona only ever sees its own building/unit/jobs.
 import { useMemo, useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
-import { PERSONA_META, boardVoteTickets } from "@/data/identity";
+import { PERSONA_META, boardVoteTickets, residentTickets, vendorTickets } from "@/data/identity";
 import { ticketFlow } from "@/data/flow";
 import { Glass, Icon, SectionLabel } from "@/components/ui";
 import { PortalShell, type PortalTab } from "./PortalShell";
+import { NoticesPanel } from "./shared/NoticesPanel";
+import { DirectLinePanel } from "./shared/DirectLinePanel";
 import { VoteCenter } from "./board/VoteCenter";
 import { BoardActivity } from "./board/BoardActivity";
 import { BoardFinances } from "./board/BoardFinances";
-import { DirectLine } from "./board/DirectLine";
-import { BoardNotices } from "./board/BoardNotices";
+import { MyRequests } from "./resident/MyRequests";
+import { SubmitRequest } from "./resident/SubmitRequest";
+import { Statements } from "./resident/Statements";
+import { Dispatches } from "./vendor/Dispatches";
+import { VendorMessages } from "./vendor/VendorMessages";
 
 const SANS = "Outfit, sans-serif";
 
 export function Portal() {
   const { currentUser, tickets } = useOrbit();
   const persona = currentUser?.persona ?? "resident";
-  const accent = typeof PERSONA_META[persona].tint === "string" && PERSONA_META[persona].tint.startsWith("#")
-    ? PERSONA_META[persona].tint
-    : "#3b82f6";
+  const accent = PERSONA_META[persona].tint.startsWith("#") ? PERSONA_META[persona].tint : "#3b82f6";
 
   const voteCount = useMemo(
     () => (currentUser && persona === "board" ? boardVoteTickets(currentUser, tickets, ticketFlow).length : 0),
+    [currentUser, persona, tickets],
+  );
+  const requestCount = useMemo(
+    () => (currentUser && persona === "resident" ? residentTickets(currentUser, tickets).filter((t) => t.status !== "Closed").length : 0),
+    [currentUser, persona, tickets],
+  );
+  const dispatchCount = useMemo(
+    () => (currentUser && persona === "vendor" ? vendorTickets(currentUser, tickets, ticketFlow).filter((t) => t.status !== "Closed").length : 0),
     [currentUser, persona, tickets],
   );
 
@@ -36,13 +46,29 @@ export function Portal() {
         { id: "directline", label: "Direct Line", icon: "messages-square" },
         { id: "notices", label: "Notices", icon: "megaphone" },
       ]
-    : [{ id: "overview", label: "Overview", icon: "panels-top-left" }];
+    : persona === "resident"
+      ? [
+          { id: "requests", label: "My Requests", icon: "clipboard-list", badge: requestCount },
+          { id: "submit", label: "Submit", icon: "plus-circle" },
+          { id: "notices", label: "Notices", icon: "megaphone" },
+          { id: "manager", label: "My Manager", icon: "messages-square" },
+          { id: "statements", label: "Statements", icon: "receipt" },
+        ]
+      : persona === "vendor"
+        ? [
+            { id: "dispatches", label: "Dispatches", icon: "hard-hat", badge: dispatchCount },
+            { id: "messages", label: "Messages", icon: "messages-square" },
+          ]
+        : [{ id: "overview", label: "Overview", icon: "panels-top-left" }];
 
   const [active, setActive] = useState(tabs[0].id);
 
   return (
     <PortalShell accent={accent} tabs={tabs} active={active} onSelect={setActive}>
-      {persona === "board" ? <BoardPage tab={active} /> : <ComingOnline persona={persona} accent={accent} />}
+      {persona === "board" && <BoardPage tab={active} />}
+      {persona === "resident" && <ResidentPage tab={active} go={setActive} />}
+      {persona === "vendor" && <VendorPage tab={active} />}
+      {persona !== "board" && persona !== "resident" && persona !== "vendor" && <ComingOnline persona={persona} accent={accent} />}
     </PortalShell>
   );
 }
@@ -52,17 +78,33 @@ function BoardPage({ tab }: { tab: string }) {
     case "vote": return <VoteCenter />;
     case "activity": return <BoardActivity />;
     case "finances": return <BoardFinances />;
-    case "directline": return <DirectLine />;
-    case "notices": return <BoardNotices />;
+    case "directline": return <DirectLinePanel heading="Direct line" opener="Hi — it's your account manager at Orbit. I'll keep the board posted on votes, finances, and building matters. Reach me here anytime." />;
+    case "notices": return <NoticesPanel />;
     default: return <VoteCenter />;
+  }
+}
+
+function ResidentPage({ tab, go }: { tab: string; go: (id: string) => void }) {
+  switch (tab) {
+    case "requests": return <MyRequests onNew={() => go("submit")} />;
+    case "submit": return <SubmitRequest onSubmitted={() => go("requests")} />;
+    case "notices": return <NoticesPanel />;
+    case "manager": return <DirectLinePanel heading="My manager" opener="Hi! I'm your account manager at Orbit. Message me anytime about your unit, a request, or anything in the building — I'm happy to help." />;
+    case "statements": return <Statements />;
+    default: return <MyRequests onNew={() => go("submit")} />;
+  }
+}
+
+function VendorPage({ tab }: { tab: string }) {
+  switch (tab) {
+    case "dispatches": return <Dispatches />;
+    case "messages": return <VendorMessages />;
+    default: return <Dispatches />;
   }
 }
 
 function ComingOnline({ persona, accent }: { persona: string; accent: string }) {
   const meta = PERSONA_META[persona as keyof typeof PERSONA_META];
-  const blurb = persona === "resident"
-    ? "Submit a request, track its progress on a live status link, read building notices, message your account manager, and view your statements — all coming to your resident portal."
-    : "Accept dispatches, confirm windows, upload completion photos and invoices, and message the Orbit team — all coming to your vendor portal.";
   return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Glass style={{ padding: 40, maxWidth: 480, textAlign: "center" }}>
@@ -70,10 +112,7 @@ function ComingOnline({ persona, accent }: { persona: string; accent: string }) 
           <Icon name={meta.icon} size={28} color={accent} />
         </div>
         <SectionLabel style={{ marginBottom: 12, textAlign: "center" }}>Portal coming online</SectionLabel>
-        <p style={{ margin: 0, fontFamily: SANS, fontSize: 14, color: "var(--ink-2)", lineHeight: 1.6 }}>{blurb}</p>
-        <p style={{ margin: "16px 0 0", fontFamily: SANS, fontSize: 12.5, color: "var(--ink-4)", lineHeight: 1.6 }}>
-          The board portal is live now — switch to a board account to see the Vote Center, finances, activity, and direct line.
-        </p>
+        <p style={{ margin: 0, fontFamily: SANS, fontSize: 14, color: "var(--ink-2)", lineHeight: 1.6 }}>This persona's portal is on the way.</p>
       </Glass>
     </div>
   );

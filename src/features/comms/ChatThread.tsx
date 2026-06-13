@@ -3,7 +3,7 @@
 // Email renders as a threaded email view. Names + avatars on both sides; "me"
 // is the acting operator. Used by the in-ticket dock and the global inbox.
 import { useEffect, useRef, useState } from "react";
-import type { Channel, CommVia, Participant } from "@/lib/types";
+import type { Channel, ChatMessage, CommVia, Participant } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { userPerson } from "@/data/identity";
 import { buildingTeam, seedChatFor } from "@/data/comms";
@@ -16,9 +16,9 @@ const MONO = "'JetBrains Mono', monospace";
 
 const VIA_ICON: Record<CommVia, string> = { SMS: "message-square", Email: "mail", "In-app": "messages-square" };
 
-export function ChatThread({ channel, onRoute }: { channel: Channel; onRoute?: (positionKey: string) => void }) {
+export function ChatThread({ channel, onRoute, seed }: { channel: Channel; onRoute?: (positionKey: string) => void; seed?: ChatMessage[] }) {
   const { chat, seedChat, sendChat, currentUser } = useOrbit();
-  useEffect(() => { seedChat(channel.id, seedChatFor(channel)); }, [channel.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { seedChat(channel.id, seed ?? seedChatFor(channel)); }, [channel.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const msgs = chat[channel.id] || [];
 
   const op = userPerson(currentUser);
