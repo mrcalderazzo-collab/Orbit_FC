@@ -1,5 +1,9 @@
 # Orbit FC — Facilities Command OS
 
+> 📌 **New here (human or AI agent)? Read [`ORBIT_CONTEXT.md`](./ORBIT_CONTEXT.md) first** —
+> it's the single source of truth for current project state, architecture, conventions,
+> decisions, and what's next. Keep it updated as the project evolves.
+
 A multi-role property-operations platform. This repository is the **production
 rebuild** of the Orbit FC design prototype, starting with the operator-facing
 **Ticket Command + Communications** vertical slice.
