@@ -62,6 +62,8 @@ interface OrbitState {
   updateTicket: (id: string, patch: Partial<Ticket>, note?: string) => void;
   /** set the operator's personal "do date" (ClickUp-style), or null to clear */
   setWorkDate: (id: string, date: string | null) => void;
+  /** bump priority one level (SLA escalation) */
+  escalateTicket: (id: string) => void;
   // ticket relationships
   spawnChildTicket: (parentId: string, data: { title: string; type?: Ticket["type"]; prio?: Ticket["prio"] }) => string;
   linkTickets: (aId: string, bId: string) => void;
@@ -204,6 +206,19 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, workDate: date } : t));
   }, []);
 
+  const escalateTicket = useCallback((id: string) => {
+    const order: Ticket["prio"][] = ["Low", "Normal", "High", "Critical"];
+    let bumped = false;
+    setTickets((ts) => ts.map((t) => {
+      if (t.id !== id) return t;
+      const next = order[Math.min(order.length - 1, order.indexOf(t.prio) + 1)];
+      if (next === t.prio) return t;
+      bumped = true;
+      return { ...t, prio: next, log: [...t.log, logLine(me(), "Escalated · priority → " + next + " (SLA at risk)")] };
+    }));
+    notify(bumped ? "Escalated · owner notified" : "Already at Critical");
+  }, [me, notify]);
+
   const seedComments = useCallback((tid: string, list: TicketComment[]) => {
     setTicketComments((s) => (s[tid] ? s : { ...s, [tid]: list }));
   }, []);
@@ -319,7 +334,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
     theme, setTheme,
-    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate,
+    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket,
     spawnChildTicket, linkTickets, mergeTickets,
     commandId, openCommand, closeCommand,
     ticketComments, seedComments, addComment,
@@ -329,7 +344,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     ballots, castBallot,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

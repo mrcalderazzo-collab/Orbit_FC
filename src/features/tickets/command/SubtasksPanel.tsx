@@ -8,6 +8,7 @@ import type { ChecklistItem, SubStatus, Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { STAGE_INDEX } from "@/data/flow";
 import { PEOPLE } from "@/data/seed";
+import { playbookFor } from "@/data/playbooks";
 import { Avatar, Btn, Glass, Icon, inputStyle, SectionLabel } from "@/components/ui";
 
 const SANS = "Outfit, sans-serif";
@@ -19,7 +20,15 @@ const STATUS_META: Record<SubStatus, { c: string; label: string; icon: string }>
   done: { c: "#22c55e", label: "Done", icon: "check" },
 };
 
-function defaultSubtasks(f: TicketFlow): ChecklistItem[] {
+function defaultSubtasks(t: Ticket, f: TicketFlow): ChecklistItem[] {
+  const pb = playbookFor(t);
+  if (pb) {
+    // playbook drives the checklist; mark early steps done if we're past triage
+    return pb.steps.map((label, i) => {
+      const done = f.stageIndex >= STAGE_INDEX.review ? true : f.stageIndex >= STAGE_INDEX.triage && i === 0;
+      return { id: "pb" + i, label, done, status: done ? "done" : "todo", assignee: null, linkedTicketId: null };
+    });
+  }
   const si = f.stageIndex;
   const mk = (id: string, label: string, done: boolean): ChecklistItem => ({ id, label, done, status: done ? "done" : "todo", assignee: null, linkedTicketId: null });
   return [
@@ -35,9 +44,10 @@ const nextStatus = (s: SubStatus): SubStatus => (s === "todo" ? "doing" : s === 
 
 export function SubtasksPanel({ t, f }: { t: Ticket; f: TicketFlow }) {
   const { ticketProgress, seedProgress, setProgressItems, postProgress, sendTicketMessage, spawnChildTicket, openCommand, tickets } = useOrbit();
-  useEffect(() => { seedProgress(t.id, { items: defaultSubtasks(f) }); }, [t.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const items = ticketProgress[t.id]?.items || defaultSubtasks(f);
+  useEffect(() => { seedProgress(t.id, { items: defaultSubtasks(t, f) }); }, [t.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = ticketProgress[t.id]?.items || defaultSubtasks(t, f);
   const children = tickets.filter((x) => x.parentId === t.id);
+  const pb = playbookFor(t);
 
   const update = (id: string, patch: Partial<ChecklistItem>) =>
     setProgressItems(t.id, items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -68,9 +78,14 @@ export function SubtasksPanel({ t, f }: { t: Ticket; f: TicketFlow }) {
 
   return (
     <Glass style={{ padding: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
         <SectionLabel>Subtasks</SectionLabel>
-        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginLeft: 8 }}>{doneUnits}/{totalUnits} done{children.length ? " · " + children.length + " child tickets" : ""}</span>
+        {pb && (
+          <span title="Loaded from a category playbook" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", color: "var(--acc-text)", background: "rgba(var(--acc-rgb),0.1)", border: "1px solid rgba(var(--acc-rgb),0.28)", padding: "2px 8px", borderRadius: 99 }}>
+            <Icon name="book-open-check" size={11} color="var(--acc-text)" />PLAYBOOK · {pb.label.toUpperCase()}
+          </span>
+        )}
+        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}>{doneUnits}/{totalUnits} done{children.length ? " · " + children.length + " child" : ""}</span>
         <span style={{ marginLeft: "auto", fontFamily: SANS, fontWeight: 600, fontSize: 22, color: c, letterSpacing: "-0.5px" }}>{pct}<span style={{ fontSize: 13, color: "var(--ink-4)" }}>%</span></span>
       </div>
       <div style={{ height: 8, borderRadius: 99, background: "var(--fill-3)", overflow: "hidden", marginBottom: 16 }}>

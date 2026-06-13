@@ -1,7 +1,7 @@
 // Ticket queue views: grouped Queue, List, Cards, Kanban Board. Mirrors Tickets.jsx.
 import { useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
-import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, ticketApproval, ticketVendorName } from "@/lib/ticket";
+import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, ticketApproval, ticketVendorName } from "@/lib/ticket";
 import { BUILDINGS, PEOPLE, TICKET_STATUS } from "@/data/seed";
 import { Avatar, Empty, Glass, Icon, PrioDot, StatusTag, Tag } from "@/components/ui";
 import { ApprovalChip } from "./ApprovalChip";
@@ -51,6 +51,10 @@ export function TicketQueue({ tickets, onOpen, flowMap = {} }: ViewProps) {
                         </div>
                         <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9, color: b.mono }}>{b.name}{ven && <span style={{ color: "var(--ink-4)" }}>· {ven}</span>}</span>
                       </div>
+                      {f && slaState(f).level !== "ok" && t.status !== "Closed" && (() => { const s = slaState(f); return (
+                        <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 8, fontWeight: 700, color: s.color, background: `color-mix(in srgb, ${s.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${s.color} 30%, transparent)`, padding: "2px 6px", borderRadius: 5, whiteSpace: "nowrap" }}>
+                          <Icon name={s.level === "breach" ? "alarm-clock-off" : "alarm-clock"} size={9} color={s.color} />{s.level === "breach" ? "SLA" : s.label}
+                        </span>); })()}
                       {(appr === "awaiting" || appr === "approved") && <span style={{ flexShrink: 0 }}><ApprovalChip state={appr} small /></span>}
                       <Tag>{t.type}</Tag>
                       <span style={{ width: 110, flexShrink: 0 }}><StatusTag status={t.status} /></span>

@@ -60,3 +60,12 @@ export const TICKET_GROUPS: {
 
 export const stageReached = (f: TicketFlow, key: keyof typeof STAGE_INDEX): boolean =>
   f.stageIndex >= STAGE_INDEX[key];
+
+// ── SLA risk ────────────────────────────────────────────────────────────
+export type SlaLevel = "ok" | "warn" | "breach";
+export function slaState(f: TicketFlow): { level: SlaLevel; remaining: number; label: string; color: string } {
+  const remaining = f.sla.hrs - f.sla.elapsed;
+  if (f.sla.breached) return { level: "breach", remaining, label: "BREACHED", color: "#ef4444" };
+  if (f.sla.pct > 70) return { level: "warn", remaining, label: remaining + "h left", color: "#f59e0b" };
+  return { level: "ok", remaining, label: remaining + "h left", color: "#22c55e" };
+}

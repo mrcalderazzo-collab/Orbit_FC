@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { moneyFull } from "@/lib/format";
+import { slaState } from "@/lib/ticket";
 import { ticketFlow } from "@/data/flow";
 import { BUILDINGS } from "@/data/seed";
 import { Icon, PrioDot, Tag } from "@/components/ui";
@@ -30,7 +31,7 @@ const TABS: [string, string, string][] = [
 ];
 
 export function TicketCommand({ id, onClose }: { id: string; onClose: () => void }) {
-  const { tickets, ticketComments, ticketMessages, openCommand } = useOrbit();
+  const { tickets, ticketComments, ticketMessages, openCommand, escalateTicket } = useOrbit();
   const t = tickets.find((x) => x.id === id);
   const [tab, setTab] = useState("overview");
   const [dock, setDock] = useState(false);
@@ -79,6 +80,11 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
           <TicketStatusMenu t={t} />
           <div><div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>DO DATE</div><DoDateMenu id={t.id} date={t.workDate} compact /></div>
           <SlaChip f={f} />
+          {slaState(f).level !== "ok" && t.prio !== "Critical" && (
+            <button onClick={() => escalateTicket(t.id)} title="Escalate — SLA at risk" style={{ display: "flex", alignItems: "center", gap: 6, height: 34, marginTop: 13, padding: "0 13px", borderRadius: 99, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer", flexShrink: 0, fontFamily: "Outfit, sans-serif", fontSize: 12, fontWeight: 600 }}>
+              <Icon name="trending-up" size={15} color="#ef4444" />Escalate
+            </button>
+          )}
           <button onClick={() => setDock((d) => !d)} title="Open communications" style={{ display: "flex", alignItems: "center", gap: 7, height: 34, padding: "0 13px", marginTop: 13, borderRadius: 99, border: "1px solid " + (dock ? "rgba(var(--acc-rgb),0.45)" : "var(--hair-3)"), background: dock ? "rgba(var(--acc-rgb),0.12)" : "var(--fill-2)", cursor: "pointer", flexShrink: 0 }}>
             <Icon name="messages-square" size={16} color={dock ? "var(--acc-text)" : "var(--ink-2)"} />
             <span style={{ fontFamily: SANS, fontSize: 12, fontWeight: 600, color: dock ? "var(--ink)" : "var(--ink-2)" }}>Message</span>
@@ -112,7 +118,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
           {tab === "overview" && <Overview t={t} b={b} f={f} onTab={setTab} />}
           {tab === "intake" && <Intake t={t} f={f} />}
           {tab === "sourcing" && <BidsVote t={t} f={f} />}
-          {tab === "vendor" && <VendorSchedule f={f} />}
+          {tab === "vendor" && <VendorSchedule t={t} f={f} />}
           {tab === "comms" && <Communications t={t} b={b} f={f} />}
           {tab === "activity" && <Activity t={t} />}
         </div>

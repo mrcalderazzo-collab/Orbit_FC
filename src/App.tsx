@@ -5,6 +5,7 @@ import { Toast } from "@/components/shell/TopBar";
 import { TicketsPage } from "@/features/tickets/TicketsPage";
 import { TicketCommand } from "@/features/tickets/command/TicketCommand";
 import { CommsPage } from "@/features/comms/CommsPage";
+import { VendorsPage } from "@/features/vendors/VendorsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
 
@@ -29,7 +30,7 @@ function CurrentPage() {
     case "integrations":
       return <ComingSoon title="Integrations" icon="blocks" note="Connect Gmail, Slack, QuickBooks, DocuSign, Stripe and more — intake routing, ledger sync, e-signing." />;
     case "vendors":
-      return <ComingSoon title="Vendors" icon="wrench" note="Vendor directory today; the Vendor Command Center (COIs, rate cards, tri-source grade, job history) is on the roadmap." />;
+      return <VendorsPage />;
     default:
       return <TicketsPage />;
   }
