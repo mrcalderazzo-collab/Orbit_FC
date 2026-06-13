@@ -90,6 +90,70 @@ export interface BuildingRecord {
   owner: string;
 }
 
+export type SiteVisitPurpose = "Vendor walk" | "Super meeting" | "Building walkthrough" | "Inspection" | "Emergency follow-up";
+
+export interface BuildingFile {
+  id: string;
+  buildingId: string;
+  name: string;
+  kind: "Floor plan" | "Photo set" | "Video" | "Report" | "Manual" | "Access";
+  area: string;
+  updatedAt: string;
+  updatedBy: string;
+  size: string;
+  relatedTicketId?: string;
+}
+
+export interface SiteVisit {
+  id: string;
+  buildingId: string;
+  purpose: SiteVisitPurpose;
+  title: string;
+  status: "Scheduled" | "Completed" | "Needs follow-up";
+  startsAt: string;
+  lead: string;
+  attendees: string[];
+  areas: string[];
+  agenda: string[];
+  notes?: string;
+  fileIds: string[];
+  relatedTicketId?: string;
+}
+
+export interface BuildingChange {
+  id: string;
+  buildingId: string;
+  title: string;
+  area: string;
+  changedAt: string;
+  changedBy: string;
+  detail: string;
+  fileIds: string[];
+  relatedTicketId?: string;
+}
+
+export interface TourHotspot {
+  id: string;
+  label: string;
+  kind: "equipment" | "issue" | "access" | "document";
+  x: number;
+  y: number;
+  detail: string;
+  relatedTicketId?: string;
+  fileId?: string;
+}
+
+export interface BuildingTourArea {
+  id: string;
+  buildingId: string;
+  floor: string;
+  name: string;
+  description: string;
+  viewpoint: string;
+  accent: string;
+  hotspots: TourHotspot[];
+}
+
 export type LogEntry = [at: string, actor: string, text: string];
 
 // ── rich intake capture (from the New Intake flow) ──────────────────────

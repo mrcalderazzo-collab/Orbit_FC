@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import type { Building, BuildingRecord, BuildingSystem, Ticket } from "@/lib/types";
+import type { Building, BuildingFile, BuildingRecord, BuildingSystem, BuildingTourArea, SiteVisit, Ticket, TourHotspot } from "@/lib/types";
 import { attentionOf } from "@/lib/attention";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ticketFlow } from "@/data/flow";
 import { BUILDINGS, PEOPLE, ROSTER } from "@/data/seed";
-import { BUILDING_RECORDS, BUILDING_SYSTEMS } from "@/data/buildings";
+import { BUILDING_CHANGES, BUILDING_FILES, BUILDING_RECORDS, BUILDING_SYSTEMS, BUILDING_TOUR_AREAS, SITE_VISITS } from "@/data/buildings";
 import { useOrbit } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
@@ -12,7 +12,7 @@ import { ThemeSwitcher } from "@/components/shell/TopBar";
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
-type DetailTab = "overview" | "systems" | "people" | "tickets" | "records";
+type DetailTab = "overview" | "visits" | "walkthrough" | "systems" | "people" | "tickets" | "files";
 
 const SYSTEM_META: Record<BuildingSystem["state"], { label: string; color: string; icon: string }> = {
   healthy: { label: "Healthy", color: "#22c55e", icon: "circle-check" },
@@ -140,6 +140,10 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
   const [tab, setTab] = useState<DetailTab>("overview");
   const systems = BUILDING_SYSTEMS.filter((system) => system.buildingId === building.id);
   const records = BUILDING_RECORDS.filter((record) => record.buildingId === building.id);
+  const visits = SITE_VISITS.filter((visit) => visit.buildingId === building.id);
+  const files = BUILDING_FILES.filter((file) => file.buildingId === building.id);
+  const changes = BUILDING_CHANGES.filter((change) => change.buildingId === building.id);
+  const tourAreas = BUILDING_TOUR_AREAS.filter((area) => area.buildingId === building.id);
   const buildingTickets = tickets.filter((ticket) => ticket.building === building.id && !ticket.mergedInto);
   const activeTickets = buildingTickets.filter((ticket) => ticket.status !== "Closed");
   const manager = PEOPLE[building.am];
@@ -172,10 +176,12 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
       <div className="building-detail-tabs">
         {([
           ["overview", "Overview", "layout-dashboard", riskSystems.length + dueRecords.length],
+          ["visits", "Site visits", "calendar-range", visits.filter((visit) => visit.status !== "Completed").length],
+          ["walkthrough", "3D walkthrough", "scan", tourAreas.length],
           ["systems", "Systems", "activity", riskSystems.length],
           ["people", "People", "users", 1 + roster.staff.length + roster.board.length],
           ["tickets", "Tickets", "ticket", activeTickets.length],
-          ["records", "Records", "folder-kanban", dueRecords.length],
+          ["files", "Files & changes", "folder-kanban", dueRecords.length],
         ] as const).map(([key, label, icon, badge]) => (
           <button key={key} onClick={() => setTab(key)} className={tab === key ? "building-tab active" : "building-tab"}>
             <Icon name={icon} size={15} color={tab === key ? "var(--acc)" : "var(--ink-4)"} />{label}
@@ -198,10 +204,12 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
             onTab={setTab}
           />
         )}
+        {tab === "visits" && <SiteVisitsTab visits={visits} files={files} onTicket={openCommand} />}
+        {tab === "walkthrough" && <VirtualWalkthrough areas={tourAreas} files={files} onTicket={openCommand} />}
         {tab === "systems" && <SystemsTab systems={systems} onTicket={openCommand} />}
         {tab === "people" && <PeopleTab building={building} />}
         {tab === "tickets" && <TicketsTab tickets={buildingTickets} onTicket={openCommand} />}
-        {tab === "records" && <RecordsTab records={records} />}
+        {tab === "files" && <FilesChangesTab files={files} records={records} changes={changes} onTicket={openCommand} />}
       </div>
     </div>
   );
@@ -230,7 +238,7 @@ function OverviewTab({
         <div className="building-kpi-grid">
           <Kpi icon="activity" label="Systems health" value={`${avgHealth}%`} sub={`${systemAlerts.length} need attention`} color={avgHealth >= 85 ? "#22c55e" : "#f59e0b"} onClick={() => onTab("systems")} />
           <Kpi icon="ticket" label="Active work" value={String(tickets.length)} sub={`${tickets.filter((ticket) => ["Critical", "High"].includes(ticket.prio)).length} high priority`} color={tickets.some((ticket) => ticket.prio === "Critical") ? "#ef4444" : "var(--ink)"} onClick={() => onTab("tickets")} />
-          <Kpi icon="folder-check" label="Records" value={String(building.docs)} sub={`${recordAlerts.length} due or in review`} color={recordAlerts.length ? "#f59e0b" : "#22c55e"} onClick={() => onTab("records")} />
+          <Kpi icon="calendar-range" label="Site visits" value={String(SITE_VISITS.filter((visit) => visit.buildingId === building.id && visit.status !== "Completed").length)} sub="walks, vendors, inspections" color="var(--acc-text)" onClick={() => onTab("visits")} />
           <Kpi icon="circle-dollar-sign" label="Monthly margin" value={fmtMoney(margin)} sub={`${fmtPct(building.delinquency)} delinquency`} color={margin >= 0 ? "#22c55e" : "#ef4444"} />
         </div>
 
@@ -261,7 +269,7 @@ function OverviewTab({
               );
             })}
             {recordAlerts.map((record) => (
-              <button key={record.id} onClick={() => onTab("records")} className="attention-row">
+              <button key={record.id} onClick={() => onTab("files")} className="attention-row">
                 <span className="attention-row-icon" style={{ background: `color-mix(in srgb, ${RECORD_META[record.status]} 10%, transparent)` }}><Icon name="file-warning" size={15} color={RECORD_META[record.status]} /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={rowTitle}>{record.title}</span>
@@ -385,20 +393,199 @@ function TicketsTab({ tickets, onTicket }: { tickets: Ticket[]; onTicket: (id: s
   );
 }
 
-function RecordsTab({ records }: { records: BuildingRecord[] }) {
+function SiteVisitsTab({ visits, files, onTicket }: { visits: SiteVisit[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
   return (
-    <Glass style={{ overflow: "hidden" }}>
-      {records.map((record) => (
-        <div key={record.id} className="building-record-row">
-          <span className="attention-row-icon"><Icon name={recordIcon(record.kind)} size={16} color="var(--ink-3)" /></span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={rowTitle}>{record.title}</span>
-            <span style={rowSub}>{record.kind} · owner {PEOPLE[record.owner]?.name || record.owner}</span>
-          </span>
-          <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-3)" }}>DUE {formatDate(record.due).toUpperCase()}</span>
-          <Tag color={RECORD_META[record.status]}>{record.status}</Tag>
+    <div className="site-visit-layout">
+      <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {visits.map((visit) => {
+          const color = visit.status === "Scheduled" ? "#3b82f6" : visit.status === "Needs follow-up" ? "#f59e0b" : "#22c55e";
+          const lead = PEOPLE[visit.lead];
+          return (
+            <Glass key={visit.id} style={{ padding: 17 }} hover accent={color}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <span className="attention-row-icon" style={{ width: 40, height: 40, background: `color-mix(in srgb, ${color} 10%, transparent)` }}>
+                  <Icon name={visit.purpose === "Vendor walk" ? "hard-hat" : visit.purpose === "Super meeting" ? "users" : "footprints"} size={19} color={color} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <h3 style={{ margin: 0, fontFamily: SANS, fontSize: 16, color: "var(--ink)", fontWeight: 600 }}>{visit.title}</h3>
+                    <Tag color={color}>{visit.status}</Tag>
+                    <Tag>{visit.purpose}</Tag>
+                  </div>
+                  <p style={{ margin: "5px 0 0", fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)" }}>{formatDateTime(visit.startsAt)} · lead {lead?.name || visit.lead}</p>
+                </div>
+                {visit.relatedTicketId && <Btn small onClick={() => onTicket(visit.relatedTicketId!)}>{visit.relatedTicketId}</Btn>}
+              </div>
+              <div className="visit-detail-grid">
+                <VisitBlock label="Meet with" values={visit.attendees} />
+                <VisitBlock label="Walk areas" values={visit.areas} />
+                <VisitBlock label="Agenda" values={visit.agenda} />
+              </div>
+              {visit.notes && <p className="visit-note"><Icon name="notebook-pen" size={14} color="var(--ink-3)" />{visit.notes}</p>}
+              <div className="visit-file-strip">
+                {visit.fileIds.map((id) => {
+                  const file = files.find((item) => item.id === id);
+                  return file ? <span key={id}><Icon name={fileIcon(file.kind)} size={13} color="var(--ink-3)" />{file.name}</span> : null;
+                })}
+              </div>
+            </Glass>
+          );
+        })}
+      </section>
+      <aside>
+        <Glass style={{ padding: 17, position: "sticky", top: 0 }}>
+          <SectionLabel style={{ marginBottom: 14 }}>Visit-ready package</SectionLabel>
+          <p style={{ margin: "0 0 14px", fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: "var(--ink-2)" }}>Everything the PM needs to walk in prepared and let the next person resume afterward.</p>
+          {["Floor plans and access map", "Open-ticket briefings", "Vendor contact and scope", "Photo checklist by area", "Voice notes and field report", "Follow-up owners and deadlines"].map((item) => (
+            <div key={item} className="visit-ready-item"><Icon name="check" size={13} color="var(--acc-text)" />{item}</div>
+          ))}
+          <Btn primary small icon="calendar-plus" style={{ marginTop: 16, width: "100%" }}>Schedule site visit</Btn>
+        </Glass>
+      </aside>
+    </div>
+  );
+}
+
+function VirtualWalkthrough({ areas, files, onTicket }: { areas: BuildingTourArea[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
+  const [areaId, setAreaId] = useState(areas[0]?.id || "");
+  const [hotspotId, setHotspotId] = useState<string | null>(areas[0]?.hotspots[0]?.id || null);
+  const area = areas.find((item) => item.id === areaId) || areas[0];
+  const hotspot = area?.hotspots.find((item) => item.id === hotspotId) || null;
+  if (!area) return null;
+
+  const selectArea = (id: string) => {
+    const next = areas.find((item) => item.id === id);
+    setAreaId(id);
+    setHotspotId(next?.hotspots[0]?.id || null);
+  };
+
+  return (
+    <div className="virtual-tour-layout">
+      <aside className="tour-area-rail">
+        <SectionLabel style={{ marginBottom: 12 }}>Walk the building</SectionLabel>
+        {areas.map((item) => (
+          <button key={item.id} onClick={() => selectArea(item.id)} className={item.id === area.id ? "tour-area active" : "tour-area"}>
+            <span>{item.floor}</span>
+            <span><strong>{item.name}</strong><small>{item.hotspots.length} mapped points</small></span>
+          </button>
+        ))}
+        <div className="tour-help"><Icon name="mouse-pointer-2" size={14} color="var(--acc-text)" />Choose a floor, then select a marker to understand the equipment, issue, access route, or file.</div>
+      </aside>
+
+      <section className="tour-stage-wrap">
+        <div className="tour-stage" style={{ "--tour-accent": area.accent } as React.CSSProperties}>
+          <div className="tour-ceiling" />
+          <div className="tour-wall tour-wall-left" />
+          <div className="tour-wall tour-wall-right" />
+          <div className="tour-floor-grid" />
+          <div className="tour-back-wall">
+            <Icon name="building-2" size={38} color={area.accent} />
+            <strong>{area.name}</strong>
+            <span>{area.viewpoint}</span>
+          </div>
+          {area.hotspots.map((item, index) => (
+            <button
+              key={item.id}
+              onClick={() => setHotspotId(item.id)}
+              className={item.id === hotspot?.id ? `tour-hotspot active ${item.kind}` : `tour-hotspot ${item.kind}`}
+              style={{ left: `${item.x}%`, top: `${item.y}%` }}
+              aria-label={item.label}
+            >
+              <span>{index + 1}</span>
+            </button>
+          ))}
+          <div className="tour-stage-label"><span>FLOOR {area.floor}</span><strong>{area.name}</strong><small>{area.description}</small></div>
+          <div className="tour-controls"><button aria-label="Look left"><Icon name="rotate-ccw" size={15} color="var(--ink-2)" /></button><button aria-label="Move forward"><Icon name="move-up" size={15} color="var(--ink-2)" /></button><button aria-label="Look right"><Icon name="rotate-cw" size={15} color="var(--ink-2)" /></button></div>
         </div>
-      ))}
+        <div className="tour-legend">
+          <Legend color="#22c55e" label="Equipment" /><Legend color="#ef4444" label="Active issue" /><Legend color="#3b82f6" label="Access" /><Legend color="#a855f7" label="Document" />
+        </div>
+      </section>
+
+      <aside>
+        <Glass style={{ padding: 17 }}>
+          <SectionLabel style={{ marginBottom: 12 }}>Selected point</SectionLabel>
+          {hotspot ? <HotspotDetail hotspot={hotspot} files={files} onTicket={onTicket} /> : <p style={{ color: "var(--ink-3)" }}>Select a marker.</p>}
+        </Glass>
+      </aside>
+    </div>
+  );
+}
+
+function HotspotDetail({ hotspot, files, onTicket }: { hotspot: TourHotspot; files: BuildingFile[]; onTicket: (id: string) => void }) {
+  const colors: Record<TourHotspot["kind"], string> = { equipment: "#22c55e", issue: "#ef4444", access: "#3b82f6", document: "#a855f7" };
+  const file = hotspot.fileId ? files.find((item) => item.id === hotspot.fileId) : null;
+  return (
+    <div>
+      <Tag color={colors[hotspot.kind]}>{hotspot.kind}</Tag>
+      <h3 style={{ margin: "12px 0 7px", fontFamily: SANS, fontSize: 18, color: "var(--ink)" }}>{hotspot.label}</h3>
+      <p style={{ margin: 0, fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: "var(--ink-2)" }}>{hotspot.detail}</p>
+      {file && <div className="hotspot-file"><Icon name={fileIcon(file.kind)} size={16} color="#a855f7" /><span><strong>{file.name}</strong><small>{file.kind} · {file.size}</small></span></div>}
+      {hotspot.relatedTicketId && <Btn primary small icon="ticket" style={{ marginTop: 14 }} onClick={() => onTicket(hotspot.relatedTicketId!)}>Open {hotspot.relatedTicketId}</Btn>}
+    </div>
+  );
+}
+
+function FilesChangesTab({ files, records, changes, onTicket }: { files: BuildingFile[]; records: BuildingRecord[]; changes: typeof BUILDING_CHANGES; onTicket: (id: string) => void }) {
+  const [section, setSection] = useState<"files" | "changes" | "records">("files");
+  return (
+    <div>
+      <div className="building-subtabs">
+        <button onClick={() => setSection("files")} className={section === "files" ? "active" : ""}>Files <span>{files.length}</span></button>
+        <button onClick={() => setSection("changes")} className={section === "changes" ? "active" : ""}>Building changes <span>{changes.length}</span></button>
+        <button onClick={() => setSection("records")} className={section === "records" ? "active" : ""}>Compliance records <span>{records.length}</span></button>
+      </div>
+      {section === "files" && <div className="building-list-grid">{files.map((file) => <FileCard key={file.id} file={file} onTicket={onTicket} />)}</div>}
+      {section === "changes" && (
+        <Glass style={{ overflow: "hidden" }}>
+          {changes.map((change) => (
+            <div key={change.id} className="building-change-row">
+              <span className="attention-row-icon"><Icon name="git-commit-horizontal" size={16} color="var(--acc-text)" /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={rowTitle}>{change.title}</span>
+                <span style={rowSub}>{change.area} · {formatDate(change.changedAt)} · {PEOPLE[change.changedBy]?.name}</span>
+                <span style={{ display: "block", marginTop: 7, fontFamily: SANS, fontSize: 12, color: "var(--ink-2)" }}>{change.detail}</span>
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                <Tag>{change.fileIds.length} files</Tag>
+                {change.relatedTicketId && <Btn small onClick={() => onTicket(change.relatedTicketId!)}>{change.relatedTicketId}</Btn>}
+              </span>
+            </div>
+          ))}
+        </Glass>
+      )}
+      {section === "records" && (
+        <Glass style={{ overflow: "hidden" }}>
+          {records.map((record) => (
+            <div key={record.id} className="building-record-row">
+              <span className="attention-row-icon"><Icon name={recordIcon(record.kind)} size={16} color="var(--ink-3)" /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={rowTitle}>{record.title}</span>
+                <span style={rowSub}>{record.kind} · owner {PEOPLE[record.owner]?.name || record.owner}</span>
+              </span>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-3)" }}>DUE {formatDate(record.due).toUpperCase()}</span>
+              <Tag color={RECORD_META[record.status]}>{record.status}</Tag>
+            </div>
+          ))}
+        </Glass>
+      )}
+    </div>
+  );
+}
+
+function FileCard({ file, onTicket }: { file: BuildingFile; onTicket: (id: string) => void }) {
+  return (
+    <Glass style={{ padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <span className="attention-row-icon" style={{ width: 38, height: 38 }}><Icon name={fileIcon(file.kind)} size={18} color="var(--acc-text)" /></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ ...rowTitle, fontSize: 13.5 }}>{file.name}</span>
+          <span style={rowSub}>{file.kind} · {file.area}</span>
+        </span>
+        <button className="file-open-button" aria-label={`Open ${file.name}`}><Icon name="arrow-up-right" size={15} color="var(--ink-3)" /></button>
+      </div>
+      <div className="file-meta-row"><span>{file.size}</span><span>Updated {formatDate(file.updatedAt)}</span><span>{PEOPLE[file.updatedBy]?.name}</span></div>
+      {file.relatedTicketId && <Btn small style={{ marginTop: 12 }} onClick={() => onTicket(file.relatedTicketId!)}>Linked {file.relatedTicketId}</Btn>}
     </Glass>
   );
 }
@@ -452,9 +639,19 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value: s
   return <div style={{ display: "flex", alignItems: "center", gap: 9 }}><Icon name={icon} size={14} color="var(--ink-4)" /><span style={{ flex: 1, fontFamily: SANS, fontSize: 12.5, color: "var(--ink-3)" }}>{label}</span><strong style={{ fontFamily: MONO, fontSize: 11, color: "var(--ink)" }}>{value}</strong></div>;
 }
 
+function VisitBlock({ label, values }: { label: string; values: string[] }) {
+  return <div><span style={micro}>{label}</span><div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 7 }}>{values.map((value) => <span key={value} style={{ display: "flex", gap: 6, fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)" }}><Icon name="chevron-right" size={12} color="var(--ink-4)" />{value}</span>)}</div></div>;
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span><i style={{ background: color }} />{label}</span>;
+}
+
 const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("");
 const formatDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const formatDateTime = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 const recordIcon = (kind: BuildingRecord["kind"]) => ({ Insurance: "shield-check", Inspection: "clipboard-check", Contract: "file-signature", Financial: "circle-dollar-sign", Governance: "landmark" }[kind]);
+const fileIcon = (kind: BuildingFile["kind"]) => ({ "Floor plan": "map", "Photo set": "images", Video: "video", Report: "file-text", Manual: "book-open", Access: "key-round" }[kind]);
 
 const pageTitle: React.CSSProperties = { margin: 0, fontFamily: SANS, fontWeight: 600, fontSize: 27, color: "var(--ink)", letterSpacing: "-0.5px" };
 const pageSub: React.CSSProperties = { margin: "6px 0 0", fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.06em", textTransform: "uppercase" };
