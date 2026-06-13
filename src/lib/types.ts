@@ -176,6 +176,9 @@ export interface AiRec {
   rec: string;
   reason: string;
   input: string;
+  source?: "claude" | "heuristic";
+  model?: string;
+  ticketId?: string;
 }
 
 export interface Emergency {

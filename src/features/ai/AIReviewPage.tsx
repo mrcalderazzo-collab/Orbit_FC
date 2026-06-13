@@ -5,27 +5,72 @@
 import { useState } from "react";
 import type { AiRec } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
-import { BUILDINGS } from "@/data/seed";
+import { BUILDINGS, buildingById } from "@/data/seed";
+import { aiPatterns, aiTriage } from "@/services/ai";
 import { Btn, Empty, Glass, Icon, Modal, SectionLabel, Tag } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
+import { AISourceBadge } from "./TicketTriagePanel";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
-const KIND_ICON: Record<string, string> = { "Maintenance triage": "wrench", "Vendor recommendation": "handshake", "Financial anomaly": "trending-up", "Lease renewal": "scroll-text", "Document review": "file-search" };
+const KIND_ICON: Record<string, string> = { "Maintenance triage": "wrench", "Intake triage": "git-branch", "Pattern / predictive": "radar", "Vendor recommendation": "handshake", "Financial anomaly": "trending-up", "Lease renewal": "scroll-text", "Document review": "file-search" };
 
 export function AIReviewPage() {
-  const { recs, decideRec } = useOrbit();
+  const { recs, decideRec, addRecs, tickets, notify } = useOrbit();
   const [open, setOpen] = useState<string | null>(null);
   const [filter, setFilter] = useState("pending");
+  const [busy, setBusy] = useState<"triage" | "patterns" | null>(null);
   const list = recs.filter((r) => (filter === "all" ? true : r.status === filter));
   const pending = recs.filter((r) => r.status === "pending").length;
+
+  const runTriage = async () => {
+    setBusy("triage");
+    try {
+      const inbound = tickets.filter((t) => t.status === "Open" && !t.mergedInto).slice(0, 6);
+      const results = await Promise.all(inbound.map(async (t) => {
+        const b = buildingById(t.building)!;
+        const r = await aiTriage(t, b.name);
+        const rec: AiRec = {
+          id: "ait_" + t.id, kind: "Intake triage", building: t.building, confidence: r.confidence,
+          status: "pending", agent: "TRIAGE_ENGINE", ticketId: t.id, source: r.source, model: r.model,
+          rec: `Route ${t.id} as ${r.priority} ${r.type}` + (r.suggestedOwnerId ? " → " + r.suggestedOwnerId : ""),
+          reason: r.summary, input: r.rationale,
+        };
+        return rec;
+      }));
+      addRecs(results);
+      notify(results.length ? results.length + " triage recommendations queued" : "No inbound tickets to triage");
+    } catch (e) { notify("Triage failed: " + (e as Error).message, "err"); }
+    finally { setBusy(null); }
+  };
+
+  const runPatterns = async () => {
+    setBusy("patterns");
+    try {
+      const active = tickets.filter((t) => t.status !== "Closed" && !t.mergedInto);
+      const r = await aiPatterns("Portfolio", active);
+      const recsOut: AiRec[] = r.patterns.map((p, i) => ({
+        id: "aip_" + i + "_" + p.ticketIds.join("-").slice(0, 12), kind: "Pattern / predictive",
+        building: tickets.find((t) => t.id === p.ticketIds[0])?.building || BUILDINGS[0].id,
+        confidence: p.confidence, status: "pending", agent: "ANOMALY_ENGINE", source: r.source, model: r.model,
+        rec: p.title, reason: p.finding + " " + p.recommendation, input: "Tickets: " + p.ticketIds.join(", "),
+      }));
+      addRecs(recsOut);
+      notify(recsOut.length ? recsOut.length + " patterns surfaced" : "No cross-ticket patterns found");
+    } catch (e) { notify("Pattern scan failed: " + (e as Error).message, "err"); }
+    finally { setBusy(null); }
+  };
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <TopBar title="AI Review Center" sub={pending + " recommendations awaiting human review"}
-        right={<div style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 13px", borderRadius: 99, background: "rgba(var(--acc-rgb),0.05)", border: "1px solid rgba(var(--acc-rgb),0.2)" }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--acc)", boxShadow: "0 0 8px var(--acc)" }} />
-          <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "var(--acc-text)", textTransform: "uppercase" }}>5 agents online</span>
+        right={<div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <Btn small icon={busy === "triage" ? "loader" : "git-branch"} disabled={!!busy} onClick={runTriage}>Triage inbound</Btn>
+          <Btn small icon={busy === "patterns" ? "loader" : "radar"} disabled={!!busy} onClick={runPatterns}>Scan patterns</Btn>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 13px", borderRadius: 99, background: "rgba(var(--acc-rgb),0.05)", border: "1px solid rgba(var(--acc-rgb),0.2)" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--acc)", boxShadow: "0 0 8px var(--acc)" }} />
+            <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "var(--acc-text)", textTransform: "uppercase" }}>5 agents online</span>
+          </div>
         </div>} />
 
       <div style={{ padding: "16px 28px 0", display: "flex", gap: 4, borderBottom: "1px solid var(--hair-2)" }}>
@@ -48,6 +93,7 @@ export function AIReviewPage() {
 }
 
 function RecCard({ r, onOpen, onDecide }: { r: AiRec; onOpen: () => void; onDecide: (id: string, d: "approved" | "rejected") => void }) {
+  const { openCommand } = useOrbit();
   const b = BUILDINGS.find((x) => x.id === r.building)!;
   const c = r.confidence > 0.9 ? "#22c55e" : r.confidence > 0.8 ? "var(--acc)" : "#f59e0b";
   const decided = r.status !== "pending";
@@ -60,6 +106,7 @@ function RecCard({ r, onOpen, onDecide }: { r: AiRec; onOpen: () => void; onDeci
             <Tag color="var(--acc-text)" bg="rgba(var(--acc-rgb),0.1)">{r.agent}</Tag>
             <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)" }}>{r.kind}</span>
             <span style={{ fontFamily: MONO, fontSize: 9.5, color: b.mono }}>· {b.name}</span>
+            {r.source && <AISourceBadge source={r.source} model={r.model} />}
             {r.status === "approved" && <Tag color="#22c55e" bg="rgba(34,197,94,0.12)">✓ APPROVED</Tag>}
             {r.status === "rejected" && <Tag color="#ef4444" bg="rgba(239,68,68,0.12)">✕ REJECTED</Tag>}
           </div>
@@ -79,6 +126,7 @@ function RecCard({ r, onOpen, onDecide }: { r: AiRec; onOpen: () => void; onDeci
       </div>
       <div style={{ display: "flex", gap: 9, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--hair)" }}>
         <Btn small ghost icon="eye" onClick={onOpen}>Inspect input</Btn>
+        {r.ticketId && <Btn small ghost icon="arrow-up-right" onClick={() => openCommand(r.ticketId!)}>Open {r.ticketId}</Btn>}
         <div style={{ flex: 1 }} />
         {!decided ? (
           <>

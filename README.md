@@ -30,8 +30,23 @@ A real, end-to-end operator workspace:
     locked visit window, reminders.
   - **Communications** — the unified surface (see below).
   - **Activity** — chain-verified audit trail with per-entry hashes.
-- **AI Review Center** — queue of AI recommendations; operator approves/rejects,
-  every decision written to the audit chain.
+- **AI layer (Claude, operator-in-the-loop)** — a real server-side AI service
+  (`server/aiService.ts`, mounted on `/api/ai/*` so the key never reaches the
+  browser) with three engines:
+  - **Triage** — per-ticket, in the Intake tab: classifies type/priority,
+    summarizes the ask, suggests an owner, and drafts a first response. The
+    operator edits and commits; nothing is auto-applied, and every commit is
+    logged. (`src/features/ai/TicketTriagePanel.tsx`)
+  - **Pattern / predictive** — scans tickets for cross-ticket clusters
+    (e.g. repeated leaks → likely riser issue → recommend inspection).
+  - **Vendor match** — recommends best-value among competitive bids.
+  Defaults to `claude-opus-4-8` (`ORBIT_AI_MODEL=claude-sonnet-4-6` for cheaper
+  triage), adaptive thinking, structured outputs. With no `ANTHROPIC_API_KEY`
+  it falls back to a deterministic heuristic — the UI badges every result
+  `CLAUDE` vs `HEURISTIC`. **AI recommends; the operator decides.**
+- **AI Review Center** — queue of recommendations (live-generated via "Triage
+  inbound" / "Scan patterns", or seeded); operator approves/rejects, every
+  decision written to the audit chain.
 
 ### Communications (design-review surface)
 

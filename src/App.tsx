@@ -3,6 +3,7 @@ import { Login } from "@/features/auth/Login";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Toast } from "@/components/shell/TopBar";
 import { TicketsPage } from "@/features/tickets/TicketsPage";
+import { TicketCommand } from "@/features/tickets/command/TicketCommand";
 import { CommsPage } from "@/features/comms/CommsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
@@ -35,7 +36,7 @@ function CurrentPage() {
 }
 
 function Shell() {
-  const { currentUser } = useOrbit();
+  const { currentUser, commandId, closeCommand } = useOrbit();
   if (!currentUser) return <Login />;
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
@@ -43,6 +44,7 @@ function Shell() {
       <main style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <CurrentPage />
       </main>
+      {commandId && <TicketCommand id={commandId} onClose={closeCommand} />}
     </div>
   );
 }

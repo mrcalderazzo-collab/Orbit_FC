@@ -53,6 +53,7 @@ interface OrbitState {
   assignTicket: (id: string, who: string) => void;
   setTicketStatus: (id: string, status: Ticket["status"]) => void;
   addTicketNote: (id: string, text: string) => void;
+  updateTicket: (id: string, patch: Partial<Ticket>, note?: string) => void;
   // ticket relationships
   spawnChildTicket: (parentId: string, data: { title: string; type?: Ticket["type"]; prio?: Ticket["prio"] }) => string;
   linkTickets: (aId: string, bId: string) => void;
@@ -76,6 +77,7 @@ interface OrbitState {
   // ai
   recs: AiRec[];
   decideRec: (id: string, decision: "approved" | "rejected") => void;
+  addRecs: (recs: AiRec[]) => void;
   // shared ballots
   ballots: Record<string, Record<string, string>>;
   castBallot: (ticketId: string, memberName: string, bidId: string) => void;
@@ -186,6 +188,10 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, log: [...t.log, logLine(me(), text)] } : t));
   }, [me]);
 
+  const updateTicket = useCallback<OrbitState["updateTicket"]>((id, patch, note) => {
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, ...patch, log: note ? [...t.log, logLine(me(), note)] : t.log } : t));
+  }, [me]);
+
   const seedComments = useCallback((tid: string, list: TicketComment[]) => {
     setTicketComments((s) => (s[tid] ? s : { ...s, [tid]: list }));
   }, []);
@@ -218,6 +224,15 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setRecs((rs) => rs.map((r) => r.id === id ? { ...r, status: decision } : r));
     notify("Recommendation " + decision + " · written to chain");
   }, [notify]);
+
+  const addRecs = useCallback((incoming: AiRec[]) => {
+    if (!incoming.length) return;
+    setRecs((rs) => {
+      const ids = new Set(rs.map((r) => r.id));
+      const fresh = incoming.filter((r) => !ids.has(r.id));
+      return [...fresh, ...rs];
+    });
+  }, []);
 
   const castBallot = useCallback((ticketId: string, memberName: string, bidId: string) => {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
@@ -292,17 +307,17 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
     theme, setTheme,
-    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote,
+    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket,
     spawnChildTicket, linkTickets, mergeTickets,
     commandId, openCommand, closeCommand,
     ticketComments, seedComments, addComment,
     ticketMessages, seedMessages, sendTicketMessage,
     ticketProgress, seedProgress, setProgressItems, postProgress,
-    recs, decideRec,
+    recs, decideRec, addRecs,
     ballots, castBallot,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

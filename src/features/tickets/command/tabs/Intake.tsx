@@ -1,7 +1,9 @@
 // Intake tab — reported issue, attached media, requester contact, access notes.
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { tint } from "@/lib/format";
+import { buildingById } from "@/data/seed";
 import { Glass, Icon, KV, PrioDot, SectionLabel, Tag } from "@/components/ui";
+import { TicketTriagePanel } from "@/features/ai/TicketTriagePanel";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -9,8 +11,11 @@ const MEDIA_ICON: Record<string, string> = { photo: "image", video: "video", pdf
 
 export function Intake({ t, f }: { t: Ticket; f: TicketFlow }) {
   const k = f.intake;
+  const b = buildingById(t.building)!;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18, alignItems: "start" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <TicketTriagePanel t={t} b={b} />
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Glass style={{ padding: 18 }}>
           <SectionLabel style={{ marginBottom: 12 }}>Reported issue</SectionLabel>
@@ -67,6 +72,7 @@ export function Intake({ t, f }: { t: Ticket; f: TicketFlow }) {
             <FlagPill on={!k.petOnSite} icon="paw-print" label={k.petOnSite ? "Pet on site" : "No pets"} warn={k.petOnSite} />
           </div>
         </Glass>
+      </div>
       </div>
     </div>
   );

@@ -10,7 +10,6 @@ import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { TicketBoard, TicketCards, TicketList, TicketQueue } from "./views";
 import { CreateTicketModal } from "./CreateTicketModal";
-import { TicketCommand } from "./command/TicketCommand";
 
 const MONO = "'JetBrains Mono', monospace";
 
@@ -24,7 +23,7 @@ const APPROVAL_OPTS = [
 const VIEWS: [string, string][] = [["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
 
 export function TicketsPage() {
-  const { tickets, commandId, openCommand, closeCommand } = useOrbit();
+  const { tickets, openCommand } = useOrbit();
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState("All");
   const [fType, setFType] = useState("All");
@@ -99,7 +98,6 @@ export function TicketsPage() {
         {view === "board" && <TicketBoard tickets={filtered} onOpen={openCommand} />}
       </div>
 
-      {commandId && <TicketCommand id={commandId} onClose={closeCommand} />}
       {creating && <CreateTicketModal onClose={() => setCreating(false)} />}
     </div>
   );
