@@ -9,7 +9,7 @@ import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
 import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { TicketBoard, TicketCards, TicketList, TicketQueue } from "./views";
-import { CreateTicketModal } from "./CreateTicketModal";
+import { NewIntakeWizard } from "@/features/intake/NewIntakeWizard";
 
 const MONO = "'JetBrains Mono', monospace";
 
@@ -65,7 +65,7 @@ export function TicketsPage() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <TopBar title="Work Tickets" sub={active + " active · " + critical + " critical"}
-        right={<Btn primary icon="plus" onClick={() => setCreating(true)}>New Ticket</Btn>} />
+        right={<Btn primary icon="plus" onClick={() => setCreating(true)}>New Intake</Btn>} />
 
       <div style={{ padding: "16px 28px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", borderBottom: "1px solid var(--hair-2)" }}>
         <div style={{ position: "relative", flex: "0 0 220px" }}>
@@ -98,7 +98,7 @@ export function TicketsPage() {
         {view === "board" && <TicketBoard tickets={filtered} onOpen={openCommand} />}
       </div>
 
-      {creating && <CreateTicketModal onClose={() => setCreating(false)} />}
+      {creating && <NewIntakeWizard onClose={() => setCreating(false)} />}
     </div>
   );
 }

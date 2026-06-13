@@ -1,9 +1,32 @@
 // flow.ts — ticket lifecycle model: stages + a deterministic generator that
 // augments any ticket with a deep workflow record (intake, bids, vote, vendor,
 // requester updates). Seeded RNG keyed on the ticket id → stable across renders.
-import type { Bid, StageKey, Ticket, TicketFlow, Vote } from "@/lib/types";
+import type { Bid, IntakeRecord, StageKey, Ticket, TicketFlow, TicketIntakeDetail, Vote } from "@/lib/types";
 import { dateShift, rng, seed } from "@/lib/format";
 import { ROSTER, buildingById } from "./seed";
+
+// Captured intake (from the New Intake flow) overrides the generated record so
+// the Intake tab shows exactly what the operator entered.
+function mergeCapturedIntake(gen: IntakeRecord, cap: TicketIntakeDetail, created?: string): IntakeRecord {
+  const s = cap.submitter;
+  const accessBits: string[] = [];
+  if (cap.access?.permissionToEnter) accessBits.push("Permission to enter granted");
+  if (cap.access?.occupantPresent) accessBits.push("occupant must be present");
+  if (cap.access?.window) accessBits.push("preferred window: " + cap.access.window);
+  if (cap.location?.detail) accessBits.push(cap.location.detail);
+  return {
+    submitter: s?.role || gen.submitter,
+    submitterName: s?.name || gen.submitterName,
+    channel: s?.channel || gen.channel,
+    unit: cap.location?.unit || s?.unit || gen.unit,
+    contact: { phone: s?.phone || gen.contact.phone, email: s?.email || gen.contact.email },
+    access: accessBits.length ? accessBits.join(" · ") : gen.access,
+    keyOnFile: cap.access?.keyOnFile ?? gen.keyOnFile,
+    petOnSite: cap.access?.petOnSite ?? gen.petOnSite,
+    media: cap.attachments?.length ? cap.attachments.map((a) => [a.kind === "doc" ? "pdf" : a.kind, a.caption || a.name] as [("photo" | "video" | "pdf"), string]) : gen.media,
+    reportedAt: cap.reportedAt || created || gen.reportedAt,
+  };
+}
 
 export const FLOW_STAGES: { key: StageKey; label: string; icon: string }[] = [
   { key: "intake", label: "Intake", icon: "inbox" },
@@ -196,24 +219,27 @@ export function ticketFlow(t: Ticket): TicketFlow {
 
   const updates = buildUpdates(stage, requiresVote, awarded, vendor);
 
+  const genIntake = {
+    submitter: subm[0],
+    submitterName: subm[1],
+    channel: FLOW_CHANNELS[Math.floor(r() * FLOW_CHANNELS.length)],
+    unit: subm[0] === "Resident" ? unit : null,
+    contact: { phone: "+1 (212) 555-0" + (100 + Math.floor(r() * 800)), email: subm[1].toLowerCase().replace(/[^a-z]/g, ".").slice(0, 10) + "@resident.io" },
+    access: ACCESS_NOTES[Math.floor(r() * ACCESS_NOTES.length)],
+    keyOnFile: r() > 0.5,
+    petOnSite: r() > 0.7,
+    media,
+    reportedAt: t.created || dateShift(-3) + "T09:00:00",
+  };
+  const intake = t.intake ? mergeCapturedIntake(genIntake, t.intake, t.created) : genIntake;
+
   return {
     stage,
     stageIndex: si,
     estimate,
     threshold,
     requiresVote,
-    intake: {
-      submitter: subm[0],
-      submitterName: subm[1],
-      channel: FLOW_CHANNELS[Math.floor(r() * FLOW_CHANNELS.length)],
-      unit: subm[0] === "Resident" ? unit : null,
-      contact: { phone: "+1 (212) 555-0" + (100 + Math.floor(r() * 800)), email: subm[1].toLowerCase().replace(/[^a-z]/g, ".").slice(0, 10) + "@resident.io" },
-      access: ACCESS_NOTES[Math.floor(r() * ACCESS_NOTES.length)],
-      keyOnFile: r() > 0.5,
-      petOnSite: r() > 0.7,
-      media,
-      reportedAt: t.created || dateShift(-3) + "T09:00:00",
-    },
+    intake,
     sla: { hrs: slaHrs, elapsed, breached, pct: Math.min(100, Math.round((elapsed / slaHrs) * 100)) },
     bids,
     awardedBidId,

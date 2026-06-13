@@ -65,6 +65,59 @@ export interface Building {
 
 export type LogEntry = [at: string, actor: string, text: string];
 
+// ── rich intake capture (from the New Intake flow) ──────────────────────
+export interface TicketAttachment {
+  id: string;
+  kind: "photo" | "video" | "doc";
+  name: string;
+  size?: string;
+  caption?: string;
+}
+export interface TicketLocation {
+  kind: "unit" | "common" | "system" | "exterior" | "building";
+  label: string;
+  unit?: string;
+  floor?: string;
+  line?: string;
+  area?: string;
+  systemKey?: string;
+  detail?: string;
+}
+export interface TicketSubmitter {
+  role: string;
+  name: string;
+  unit?: string;
+  phone?: string;
+  email?: string;
+  channel: string;
+  preferredContact?: string;
+  onBehalfOf?: string;
+}
+export interface TicketAccess {
+  keyOnFile: boolean;
+  permissionToEnter: boolean;
+  petOnSite: boolean;
+  occupantPresent: boolean;
+  window?: string;
+}
+export interface TicketBilling {
+  billableTo?: string;
+  budgetLine?: string;
+  estimate?: number;
+  warranty?: boolean;
+}
+export interface TicketIntakeDetail {
+  category: string; // taxonomy category key
+  subcategory?: string;
+  location?: TicketLocation;
+  submitter?: TicketSubmitter;
+  access?: TicketAccess;
+  attachments?: TicketAttachment[];
+  tags?: string[];
+  billing?: TicketBilling;
+  reportedAt?: string;
+}
+
 export interface Ticket {
   id: string;
   title: string;
@@ -87,6 +140,12 @@ export interface Ticket {
   linkedIds?: string[];
   /** when merged as a duplicate, the canonical ticket id this folded into */
   mergedInto?: string | null;
+  /** taxonomy category key (richer than `type`); top-level for quick filter */
+  category?: string;
+  /** operational tags (Recurring, Warranty, After-hours, …) */
+  tags?: string[];
+  /** full captured intake from the New Intake flow */
+  intake?: TicketIntakeDetail;
 }
 
 export interface Bid {

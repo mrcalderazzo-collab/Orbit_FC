@@ -2,6 +2,7 @@
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { tint } from "@/lib/format";
 import { buildingById } from "@/data/seed";
+import { categoryByKey } from "@/data/taxonomy";
 import { Glass, Icon, KV, PrioDot, SectionLabel, Tag } from "@/components/ui";
 import { TicketTriagePanel } from "@/features/ai/TicketTriagePanel";
 
@@ -12,6 +13,7 @@ const MEDIA_ICON: Record<string, string> = { photo: "image", video: "video", pdf
 export function Intake({ t, f }: { t: Ticket; f: TicketFlow }) {
   const k = f.intake;
   const b = buildingById(t.building)!;
+  const cat = t.category ? categoryByKey(t.category) : undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <TicketTriagePanel t={t} b={b} />
@@ -19,9 +21,19 @@ export function Intake({ t, f }: { t: Ticket; f: TicketFlow }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Glass style={{ padding: 18 }}>
           <SectionLabel style={{ marginBottom: 12 }}>Reported issue</SectionLabel>
+          {cat && (
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12, flexWrap: "wrap" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 99, background: tint(cat.color, 14), border: "1px solid " + tint(cat.color, 36), fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: cat.color }}>
+                <Icon name={cat.icon} size={12} color={cat.color} />{cat.label.toUpperCase()}
+              </span>
+              {t.intake?.subcategory && <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--ink-3)" }}>{t.intake.subcategory}</span>}
+              {t.intake?.location?.label && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)" }}><Icon name="map-pin" size={11} color="var(--ink-4)" />{t.intake.location.label}</span>}
+            </div>
+          )}
           <p style={{ margin: "0 0 14px", fontFamily: SANS, fontSize: 14.5, color: "var(--ink-2)", lineHeight: 1.6 }}>{t.desc || "Reported via " + k.channel + ". " + k.access}</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <Tag>{k.channel}</Tag><Tag>{t.type}</Tag><PrioDot prio={t.prio} />
+            {(t.tags || []).map((tag) => <Tag key={tag} color="var(--acc-text)" bg="rgba(var(--acc-rgb),0.1)">{tag}</Tag>)}
           </div>
         </Glass>
 
