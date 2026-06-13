@@ -13,8 +13,11 @@ import { PortalShell, type PortalTab } from "./PortalShell";
 import { NoticesPanel } from "./shared/NoticesPanel";
 import { DirectLinePanel } from "./shared/DirectLinePanel";
 import { VoteCenter } from "./board/VoteCenter";
-import { BoardActivity } from "./board/BoardActivity";
-import { BoardFinances } from "./board/BoardFinances";
+import { BoardDashboard } from "./board/BoardDashboard";
+import { BoardFinancials } from "./board/BoardFinancials";
+import { BoardCompliance } from "./board/BoardCompliance";
+import { BoardProjects } from "./board/BoardProjects";
+import { BoardDocs } from "./board/BoardDocs";
 import { MyRequests } from "./resident/MyRequests";
 import { SubmitRequest } from "./resident/SubmitRequest";
 import { Statements } from "./resident/Statements";
@@ -65,9 +68,12 @@ export function Portal() {
 
   const tabs: PortalTab[] = persona === "board"
     ? [
+        { id: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
         { id: "vote", label: "Vote Center", icon: "vote", badge: voteCount },
-        { id: "activity", label: "Activity", icon: "activity" },
-        { id: "finances", label: "Finances", icon: "circle-dollar-sign" },
+        { id: "financials", label: "Financials", icon: "circle-dollar-sign" },
+        { id: "compliance", label: "Compliance", icon: "clipboard-check" },
+        { id: "projects", label: "Projects", icon: "hard-hat" },
+        { id: "docs", label: "Documents", icon: "folder" },
         { id: "directline", label: "Direct Line", icon: "messages-square" },
         { id: "notices", label: "Notices", icon: "megaphone" },
       ]
@@ -101,7 +107,7 @@ export function Portal() {
   return (
     <PortalShell accent={accent} tabs={tabs} active={active} onSelect={setActive}
       toolbar={persona === "super" ? <SuperToolbar assigned={assigned} active={bldg} onPick={setActiveBldg} /> : undefined}>
-      {persona === "board" && <BoardPage tab={active} />}
+      {persona === "board" && <BoardPage tab={active} go={setActive} />}
       {persona === "resident" && <ResidentPage tab={active} go={setActive} />}
       {persona === "vendor" && <VendorPage tab={active} />}
       {persona === "super" && bldg && <SuperPage tab={active} buildingId={bldg} go={setActive} onCreate={openCreate} onOpenTask={setTaskId} />}
@@ -173,14 +179,17 @@ function SuperToolbar({ assigned, active, onPick }: { assigned: string[]; active
   );
 }
 
-function BoardPage({ tab }: { tab: string }) {
+function BoardPage({ tab, go }: { tab: string; go: (id: string) => void }) {
   switch (tab) {
+    case "dashboard": return <BoardDashboard go={go} />;
     case "vote": return <VoteCenter />;
-    case "activity": return <BoardActivity />;
-    case "finances": return <BoardFinances />;
+    case "financials": return <BoardFinancials />;
+    case "compliance": return <BoardCompliance />;
+    case "projects": return <BoardProjects />;
+    case "docs": return <BoardDocs />;
     case "directline": return <DirectLinePanel heading="Direct line" opener="Hi — it's your account manager at Orbit. I'll keep the board posted on votes, finances, and building matters. Reach me here anytime." />;
     case "notices": return <NoticesPanel />;
-    default: return <VoteCenter />;
+    default: return <BoardDashboard go={go} />;
   }
 }
 

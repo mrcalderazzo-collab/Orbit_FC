@@ -128,9 +128,15 @@ Operator app, fully working on seed data:
   resident blue / vendor amber) with a scoped tab bar + account menu (return to Orbit
   team / sign out), rendered full-screen for any non-operator (see `App.tsx`). **All three
   portals are live:**
-  - **Board:** Vote Center (directors cast ballots via the shared `castBallot` store →
-    appear live in the operator's Bids & Vote tab; live tally + quorum + roster), Activity
-    (their building only, public tracker), Finances & compliance, Direct Line, Notices.
+  - **Board (purple) — full governance suite** (`data/governance.ts` holds deterministic
+    compliance/projects/decisions/minutes/financial-trend data): **Dashboard** (building
+    health, money KPIs, "needs the board" = votes + compliance actions + approvals, capital
+    projects, recent decisions), **Vote Center** (shared ballot store → live in operator
+    Bids & Vote), **Financials** (reserve trajectory + income/expense charts via inline SVG,
+    ratios, budget vs actual, capital commitments), **Compliance** (LL11/LL97/LL152/LL84 +
+    elevator/boiler/sprinkler/fire-alarm filing calendar, status-coded), **Projects** (capital
+    pipeline w/ budget vs spent), **Documents** (minutes, decisions, record/document library),
+    **Direct Line**, **Notices**.
   - **Resident:** My Requests (public tracker, scoped to their unit), Submit Request
     (AI-first via `aiClassifyIntake` → `createTicket` seam, tagged `_residentOwner`),
     Notices, My Manager (Direct Line to AM), Statements (deterministic unit ledger).
