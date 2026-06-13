@@ -22,7 +22,9 @@ export function ChatThread({ channel, onRoute }: { channel: Channel; onRoute?: (
   const msgs = chat[channel.id] || [];
 
   const op = userPerson(currentUser);
+  const meId = currentUser?.persona === "operator" ? currentUser.who : undefined;
   const me: Participant = { id: "me", name: op?.name ?? "You", initials: op?.initials ?? "ME", color: "var(--acc)", role: "Orbit · You", kind: "operator" };
+  const covering = !!channel.routedTo && !!meId && meId !== channel.routedTo.personId;
 
   const [via, setVia] = useState<CommVia>(channel.defaultVia);
   const [phone, setPhone] = useState(channel.defaultVia === "SMS");
@@ -88,6 +90,11 @@ export function ChatThread({ channel, onRoute }: { channel: Channel; onRoute?: (
             <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{channel.routedTo.personName}</span>
             <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--acc-text)" }}>· {channel.routedTo.position}</span>
           </span>
+          {covering && (
+            <span title="You are not the line owner — your replies are clearly attributed to you" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#f59e0b", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", padding: "2px 7px", borderRadius: 6 }}>
+              <Icon name="user-cog" size={10} color="#f59e0b" />COVERING · YOU ARE {(op?.name || "").toUpperCase()}
+            </span>
+          )}
           {onRoute && (
             <button onClick={() => setRouteOpen((o) => !o)} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99, cursor: "pointer", background: "var(--fill-2)", border: "1px solid var(--hair-3)", color: "var(--ink-2)", fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em" }}>
               <Icon name="repeat" size={11} color="var(--ink-3)" />REROUTE
@@ -171,7 +178,7 @@ function Bubble({ sender, mine, text, at, toAll }: { sender: Participant; mine: 
       <span style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", background: sender.color + "22", color: sender.color, fontFamily: MONO, fontSize: 9, fontWeight: 700 }}>{sender.initials}</span>
       <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "76%", gap: 3 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 2px" }}>
-          <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, color: mine ? "var(--acc-text)" : sender.color }}>{mine ? "You" : sender.name}</span>
+          <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 600, color: mine ? "var(--acc-text)" : sender.color }}>{mine ? "You · " + sender.name.split(" ")[0] : sender.name}</span>
           {toAll && <span style={{ fontFamily: MONO, fontSize: 7.5, fontWeight: 700, color: "#a855f7", background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.3)", padding: "0 5px", borderRadius: 5 }}>@BOARD</span>}
           <span style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-5)" }}>{at.slice(5)}</span>
         </div>

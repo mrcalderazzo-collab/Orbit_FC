@@ -9,6 +9,7 @@ import { VendorsPage } from "@/features/vendors/VendorsPage";
 import { NoticesPage } from "@/features/notices/NoticesPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
+import { CommandDeck } from "@/features/dashboard/CommandDeck";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
 
 function CurrentPage() {
@@ -22,7 +23,7 @@ function CurrentPage() {
     case "ai":
       return <AIReviewPage />;
     case "dashboard":
-      return <ComingSoon title="Command Deck" icon="layout-dashboard" note="Portfolio dashboard — income trend, open work, AI queue, docked board chat. Three layout variants (command / briefing / bento)." />;
+      return <CommandDeck />;
     case "emergencies":
       return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
     case "buildings":

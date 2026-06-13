@@ -171,9 +171,10 @@ export function seedChatFor(channel: Channel): ChatMessage[] {
       "the elevator modernization budget", "our insurance renewal", "the Q2 financials",
     ];
     const topic = topics[Math.abs(seed(channel.id)) % topics.length];
+    // lead with the board's inbound message so the thread doesn't put words in
+    // the operator's mouth — the line is owned by routedTo, awaiting a reply.
     return [
-      mk(channel.id, "me", "In-app", `Hi — you've got a direct line to me here anytime. Happy to help.`, d(2, 1)),
-      mk(channel.id, contact.id, "In-app", `Thanks ${mgr}. The board wanted to check in on ${topic} — could you give us a quick read when you have a moment?`, d(0, 2)),
+      mk(channel.id, contact.id, "In-app", `Hi ${mgr} — the board wanted to check in on ${topic}. Could you give us a quick read when you have a moment?`, d(0, 2)),
     ];
   }
   if (channel.kind === "boardDirect") {

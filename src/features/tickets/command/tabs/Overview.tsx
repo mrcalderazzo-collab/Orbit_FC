@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Avatar, Btn, Glass, Icon, KV, SectionLabel } from "@/components/ui";
 import { SubtasksPanel } from "../SubtasksPanel";
 import { LinkMergeModal } from "../LinkMergeModal";
+import { ResumeBriefing } from "../ResumeBriefing";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -22,6 +23,7 @@ export function Overview({ t, b, f, onTab }: { t: Ticket; b: Building; f: Ticket
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <ResumeBriefing t={t} f={f} onTab={onTab} />
         <Glass style={{ padding: 18 }}>
           <SectionLabel style={{ marginBottom: 10 }}>The request</SectionLabel>
           <p style={{ margin: 0, fontFamily: SANS, fontSize: 14.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
