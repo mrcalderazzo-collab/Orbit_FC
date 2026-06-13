@@ -8,6 +8,8 @@ import { BUILDING_CHANGES, BUILDING_FILES, BUILDING_RECORDS, BUILDING_SYSTEMS, B
 import { useOrbit } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
+import { BuildingMap } from "./BuildingMap";
+import { buildingImage } from "@/data/buildings";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -34,7 +36,7 @@ export function BuildingsPage({ buildingId }: { buildingId: string | null }) {
   return <BuildingDirectory onOpen={(id) => nav("buildings", id)} />;
 }
 
-type DirRow = { building: Building; activeTickets: Ticket[]; urgent: number; riskSystems: number; avgHealth: number };
+export type DirRow = { building: Building; activeTickets: Ticket[]; urgent: number; riskSystems: number; avgHealth: number };
 type DirView = "grid" | "list" | "map";
 
 const VIEWS: { key: DirView; label: string; icon: string }[] = [
@@ -43,13 +45,7 @@ const VIEWS: { key: DirView; label: string; icon: string }[] = [
   { key: "map", label: "Map", icon: "map" },
 ];
 
-// Approximate placement on a stylized NYC canvas (x: west→east, y: north→south).
-const BUILDING_MAP: Record<string, { x: number; y: number }> = {
-  b1: { x: 33, y: 41 }, b2: { x: 39, y: 70 }, b3: { x: 52, y: 33 }, b4: { x: 38, y: 22 },
-  b5: { x: 55, y: 26 }, b6: { x: 56, y: 80 }, b7: { x: 82, y: 52 }, b8: { x: 63, y: 67 },
-};
-
-function rowAttention(row: DirRow): { color: string; label: string } {
+export function rowAttention(row: DirRow): { color: string; label: string } {
   if (row.urgent > 0 || row.riskSystems > 0 || row.building.compliance === "alert") return { color: "#ef4444", label: "Needs attention" };
   if (row.building.compliance === "review") return { color: "#f59e0b", label: "Review due" };
   return { color: "#22c55e", label: "Healthy" };
@@ -138,9 +134,11 @@ function BuildingGridCard({ row, onOpen }: { row: DirRow; onOpen: (id: string) =
   const { building, activeTickets, urgent, riskSystems, avgHealth } = row;
   const manager = PEOPLE[building.am];
   const healthColor = avgHealth >= 85 ? "#22c55e" : avgHealth >= 70 ? "#f59e0b" : "#ef4444";
+  const photo = buildingImage(building.id);
   return (
     <button onClick={() => onOpen(building.id)} className="building-card-button" aria-label={`Open ${building.name}`}>
       <Glass hover accent={building.mono} className="building-card">
+        <div className="building-card-photo" style={{ backgroundImage: photo ? `url(${photo})` : undefined, backgroundColor: `color-mix(in srgb, ${building.mono} 18%, var(--fill-2))` }} />
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <span className="building-mark" style={{ color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
             <Icon name="building-2" size={21} color={building.mono} />
@@ -196,12 +194,11 @@ function BuildingList({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) =
         const manager = PEOPLE[building.am];
         const healthColor = avgHealth >= 85 ? "#22c55e" : avgHealth >= 70 ? "#f59e0b" : "#ef4444";
         const attn = rowAttention(row);
+        const photo = buildingImage(building.id);
         return (
           <button key={building.id} onClick={() => onOpen(building.id)} className="building-list-row" aria-label={`Open ${building.name}`}>
             <span className="bl-name">
-              <span className="building-mark" style={{ width: 34, height: 34, borderRadius: 10, color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
-                <Icon name="building-2" size={17} color={building.mono} />
-              </span>
+              <span className="bl-thumb" style={{ backgroundImage: photo ? `url(${photo})` : undefined, backgroundColor: `color-mix(in srgb, ${building.mono} 18%, var(--fill-2))` }} />
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontFamily: SANS, fontSize: 13.5, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{building.name}</span>
                 <span style={micro}>{building.code}</span>
@@ -231,48 +228,6 @@ function BuildingList({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) =
   );
 }
 
-function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) => void }) {
-  const [hover, setHover] = useState<string | null>(null);
-  return (
-    <div className="building-map-wrap">
-      <div className="building-map">
-        <span className="building-map-boro" style={{ left: "30%", top: "30%" }}>MANHATTAN</span>
-        <span className="building-map-boro" style={{ left: "55%", top: "86%" }}>BROOKLYN</span>
-        <span className="building-map-boro" style={{ left: "84%", top: "40%" }}>QUEENS</span>
-        {rows.map((row) => {
-          const pos = BUILDING_MAP[row.building.id] || { x: 50, y: 50 };
-          const attn = rowAttention(row);
-          const on = hover === row.building.id;
-          return (
-            <button
-              key={row.building.id}
-              className="building-map-pin"
-              style={{ left: `${pos.x}%`, top: `${pos.y}%`, zIndex: on ? 5 : 1 }}
-              onMouseEnter={() => setHover(row.building.id)}
-              onMouseLeave={() => setHover((h) => (h === row.building.id ? null : h))}
-              onClick={() => onOpen(row.building.id)}
-              aria-label={`Open ${row.building.name}`}
-            >
-              <span className="building-map-dot" style={{ background: attn.color, boxShadow: `0 0 0 4px ${attn.color}33` }} />
-              {on && (
-                <span className="building-map-tip">
-                  <strong>{row.building.name}</strong>
-                  <small>{row.building.type} · {row.building.units} units · {attn.label}</small>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="building-map-legend">
-        <Legend color="#22c55e" label="Healthy" />
-        <Legend color="#f59e0b" label="Review due" />
-        <Legend color="#ef4444" label="Needs attention" />
-        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}>{rows.length} of {BUILDINGS.length} shown · click a pin to open</span>
-      </div>
-    </div>
-  );
-}
 
 function BuildingDetail({ building, onBack }: { building: Building; onBack: () => void }) {
   const { tickets, notices, workOrders, openCommand, nav } = useOrbit();
@@ -297,9 +252,13 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
     <div style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
       <header className="building-detail-header">
         <button onClick={onBack} className="building-back" aria-label="Back to buildings"><Icon name="arrow-left" size={17} color="var(--ink-2)" /></button>
-        <span className="building-mark" style={{ color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
-          <Icon name="building-2" size={21} color={building.mono} />
-        </span>
+        {buildingImage(building.id)
+          ? <span className="building-hero" style={{ backgroundImage: `url(${buildingImage(building.id)})`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }} />
+          : (
+            <span className="building-mark" style={{ color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
+              <Icon name="building-2" size={21} color={building.mono} />
+            </span>
+          )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <h1 style={{ ...pageTitle, fontSize: 24 }}>{building.name}</h1>

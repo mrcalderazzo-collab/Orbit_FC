@@ -232,6 +232,31 @@ html[data-theme="clear"] {
 .building-card {
   padding: 17px;
 }
+.building-card-photo {
+  height: 128px;
+  margin: -17px -17px 14px;
+  border-radius: 20px 20px 0 0;
+  background-size: cover;
+  background-position: center;
+}
+.bl-thumb {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  border: 1px solid var(--hair-2);
+  background-size: cover;
+  background-position: center;
+}
+.building-hero {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  border: 1px solid var(--hair-3);
+  background-size: cover;
+  background-position: center;
+}
 .building-card-button {
   display: block;
   width: 100%;
@@ -374,95 +399,81 @@ html[data-theme="clear"] {
   min-width: 0;
 }
 
-/* ── map view ────────────────────────────────────────────────────────── */
-.building-map-wrap {
+/* ── map view (Leaflet) ──────────────────────────────────────────────── */
+.bmap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+.bmap-main {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  min-width: 0;
 }
-.building-map {
-  position: relative;
+.bmap {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 380px;
+  height: min(62vh, 560px);
   border: 1px solid var(--hair-2);
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 32% 36%, rgba(var(--acc-rgb), 0.05), transparent 42%),
-    repeating-linear-gradient(0deg, transparent 0 39px, var(--hair) 39px 40px),
-    repeating-linear-gradient(90deg, transparent 0 39px, var(--hair) 39px 40px),
-    var(--fill-1);
+  background: var(--fill-1);
+  z-index: 0;
 }
-.building-map-boro {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font: 700 11px "JetBrains Mono", monospace;
-  letter-spacing: 0.2em;
-  color: var(--ink-5);
-  pointer-events: none;
-  white-space: nowrap;
-}
-.building-map-pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.building-map-dot {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid var(--panel-solid);
-  transition: transform 0.15s;
-}
-.building-map-pin:hover .building-map-dot {
-  transform: scale(1.3);
-}
-.building-map-tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 9px);
-  transform: translateX(-50%);
-  white-space: nowrap;
+.bmap-side {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 7px 11px;
-  border-radius: 10px;
-  background: var(--panel-solid);
-  border: 1px solid var(--hair-strong);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
-}
-.building-map-tip strong {
-  font: 600 12.5px "Outfit", sans-serif;
-  color: var(--ink);
-}
-.building-map-tip small {
-  font: 9px "JetBrains Mono", monospace;
-  color: var(--ink-4);
+  gap: 12px;
 }
 .building-map-legend {
   display: flex;
   align-items: center;
   gap: 16px;
 }
-.building-map-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: 700 9px "JetBrains Mono", monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+/* leaflet pin (divIcon) */
+.bmap-pin {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 32%, transparent), 0 2px 6px rgba(0, 0, 0, 0.45);
+  position: relative;
+  transition: transform 0.15s;
 }
-.building-map-legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
+.bmap-pin.sel {
+  transform: scale(1.35);
+  z-index: 10;
+}
+.bmap-badge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 99px;
+  background: #0a0a0c;
+  color: #fff;
+  font: 700 9px "JetBrains Mono", monospace;
+  font-style: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+/* keep leaflet controls/popups on the app's dark surfaces legible */
+.leaflet-bar a,
+.leaflet-control-attribution {
+  background: var(--panel-solid);
+  color: var(--ink-3);
+  border-color: var(--hair-2);
+}
+.leaflet-control-attribution a { color: var(--acc-text); }
+
+@media (max-width: 900px) {
+  .bmap-layout { grid-template-columns: 1fr; }
 }
 
 .building-detail-header {

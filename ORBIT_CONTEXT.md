@@ -38,6 +38,8 @@ Sign in as **Marcus Webb** for the full operator view.
 
 ## 3. Stack
 - React 18 + TypeScript + Vite + TailwindCSS (theme tokens) + Lucide icons.
+- Leaflet (real map view; theme-aware Carto basemap tiles, no API key) — used by the
+  Buildings Map view. Building geo + photos live in `data/buildings.ts`.
 - State: a typed React context, `src/store/OrbitProvider.tsx`. **Its action surface is
   the seam the real backend will implement** — UI never touches data sources directly.
 - AI layer: `server/aiService.ts` + `api/ai/*` (Vercel functions / Vite dev middleware).
@@ -109,9 +111,15 @@ Operator app, fully working on seed data:
 - **Buildings** (added by Codex): directory + 7-tab detail (Overview, Site visits,
   **3D walkthrough** w/ hotspots, Systems w/ health, People, Tickets, Files & changes).
   Directory now has **3 view modes** — Grid (cards), List (dense table), and **Map**
-  (stylized NYC canvas with attention-colored pins). Each building has a resident
-  **superintendent** record (`supers.ts`: contact, shift, certs, responsibilities, access,
-  on-site staff).
+  (real **Leaflet** map on Carto tiles with real per-building lat/lng; pins colored by
+  attention + badged with open field-work count; click a pin → side panel with the
+  building photo + open field tickets + "Open building"). The Map also computes a
+  **Dispatch efficiency** panel: the same open issue type across 2+ buildings, with the
+  km spread (haversine) flagged **Batchable** when within ~4 km — the "send one crew /
+  similar vendor in the area" idea. Every building has **photos** (`BUILDING_IMAGES`,
+  shown on grid cards, list thumbs, detail hero, map panel) and a resident
+  **superintendent** record (`supers.ts`: contact, shift, certs, responsibilities,
+  access, on-site staff).
 - **Closure checklist**: status alone can't close — requires evidence + comms + settled
   invoice + resident confirmation.
 - **Global search** (⌘K) across tickets/buildings/vendors/people.

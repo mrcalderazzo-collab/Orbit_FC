@@ -1,6 +1,38 @@
 import type { BuildingChange, BuildingFile, BuildingRecord, BuildingSystem, BuildingTourArea, SiteVisit } from "@/lib/types";
 import { addDaysISO } from "@/lib/focus";
 
+// ── geography ────────────────────────────────────────────────────────────
+// Approximate real lat/lng for each building (from its address) so the map view
+// can place pins on real tiles. In production these come from geocoding on
+// intake; here they're hand-set to the seed addresses.
+export const BUILDING_GEO: Record<string, { lat: number; lng: number }> = {
+  b1: { lat: 40.7428, lng: -73.9971 }, // 245 W 19th St — Chelsea
+  b2: { lat: 40.7081, lng: -74.0139 }, // 88 Greenwich St — FiDi
+  b3: { lat: 40.7561, lng: -73.9686 }, // 312 E 53rd St — Midtown East
+  b4: { lat: 40.7882, lng: -73.9745 }, // 540 Amsterdam Ave — UWS
+  b5: { lat: 40.7616, lng: -73.9618 }, // 410 E 61st St — UES
+  b6: { lat: 40.6906, lng: -73.9933 }, // 77 Clinton St — Brooklyn Heights
+  b7: { lat: 40.7038, lng: -73.8084 }, // Linden Park — Queens
+  b8: { lat: 40.7213, lng: -73.9648 }, // 175 Kent Ave — Williamsburg
+};
+
+// ── imagery ──────────────────────────────────────────────────────────────
+// Building photos (verified Unsplash URLs). Keyed by id; rendered with a tinted
+// fallback if a fetch ever fails.
+const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=900&q=60`;
+export const BUILDING_IMAGES: Record<string, string> = {
+  b1: img("1486406146926-c627a92ad1ab"), // glass tower
+  b2: img("1480714378408-67cf0d13bc1b"), // NYC skyline tower
+  b3: img("1496588152823-86ff7695e68f"), // midtown facade
+  b4: img("1567684014761-b65e2e59b9eb"), // prewar residential
+  b5: img("1512453979798-5ea266f8880c"), // uptown high-rise
+  b6: img("1518235506717-e1ed3306a89b"), // brownstone row
+  b7: img("1545324418-cc1a3fa10c00"), // garden apartments
+  b8: img("1554995207-c18c203602cb"), // modern waterfront block
+};
+
+export const buildingImage = (id: string): string | undefined => BUILDING_IMAGES[id];
+
 const systems = (
   buildingId: string,
   rows: Array<Omit<BuildingSystem, "id" | "buildingId">>,
