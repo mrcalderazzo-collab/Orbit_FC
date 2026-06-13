@@ -24,7 +24,7 @@ const APPROVAL_OPTS = [
 const VIEWS: [string, string][] = [["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
 
 export function TicketsPage() {
-  const { tickets } = useOrbit();
+  const { tickets, commandId, openCommand, closeCommand } = useOrbit();
   const [q, setQ] = useState("");
   const [fStatus, setFStatus] = useState("All");
   const [fType, setFType] = useState("All");
@@ -32,7 +32,6 @@ export function TicketsPage() {
   const [fVendor, setFVendor] = useState("All");
   const [fApproval, setFApproval] = useState("All");
   const [view, setView] = useState("queue");
-  const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const flowMap = useMemo(() => {
@@ -49,6 +48,7 @@ export function TicketsPage() {
 
   const filtered = tickets.filter((t) => {
     const f = flowMap[t.id];
+    if (t.mergedInto) return false; // duplicates folded into their canonical ticket
     if (fStatus !== "All" && t.status !== fStatus) return false;
     if (fType !== "All" && t.type !== fType) return false;
     if (fBuilding !== "All" && t.building !== fBuilding) return false;
@@ -93,13 +93,13 @@ export function TicketsPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>
-        {view === "queue" && <TicketQueue tickets={filtered} onOpen={setOpen} flowMap={flowMap} />}
-        {view === "list" && <TicketList tickets={filtered} onOpen={setOpen} flowMap={flowMap} />}
-        {view === "cards" && <TicketCards tickets={filtered} onOpen={setOpen} />}
-        {view === "board" && <TicketBoard tickets={filtered} onOpen={setOpen} />}
+        {view === "queue" && <TicketQueue tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
+        {view === "list" && <TicketList tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
+        {view === "cards" && <TicketCards tickets={filtered} onOpen={openCommand} />}
+        {view === "board" && <TicketBoard tickets={filtered} onOpen={openCommand} />}
       </div>
 
-      {open && <TicketCommand id={open} onClose={() => setOpen(null)} />}
+      {commandId && <TicketCommand id={commandId} onClose={closeCommand} />}
       {creating && <CreateTicketModal onClose={() => setCreating(false)} />}
     </div>
   );

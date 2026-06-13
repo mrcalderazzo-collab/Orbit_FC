@@ -81,6 +81,12 @@ export interface Ticket {
   log: LogEntry[];
   /** internal marker linking a ticket to a resident user (impersonation scope) */
   _residentOwner?: string;
+  /** parent ticket id when this was spawned as a subtask/child */
+  parentId?: string | null;
+  /** related (non-hierarchical) ticket ids */
+  linkedIds?: string[];
+  /** when merged as a duplicate, the canonical ticket id this folded into */
+  mergedInto?: string | null;
 }
 
 export interface Bid {
@@ -213,10 +219,51 @@ export interface TicketMessage {
   auto?: boolean;
 }
 
+export type SubStatus = "todo" | "doing" | "done";
 export interface ChecklistItem {
   id: string;
   label: string;
   done: boolean;
+  status?: SubStatus;
+  assignee?: string | null;
+  note?: string;
+  /** set when the subtask has been promoted into its own child ticket */
+  linkedTicketId?: string | null;
+}
+
+// ── Live chat (Communications) ──────────────────────────────────────────
+export type ChannelKind = "resident" | "board" | "boardDirect" | "team" | "vendor";
+export type CommVia = "SMS" | "Email" | "In-app";
+
+export interface Participant {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  role: string;
+  kind: "operator" | "resident" | "board" | "vendor" | "ai";
+}
+
+export interface Channel {
+  id: string;
+  kind: ChannelKind;
+  buildingId: string;
+  ticketId?: string;
+  title: string;
+  subtitle: string;
+  participants: Participant[];
+  defaultVia: CommVia;
+  vias: CommVia[];
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  senderId: string; // participant id ("me" for the acting operator)
+  via: CommVia;
+  text: string;
+  at: string;
+  toAll?: boolean; // @board broadcast
 }
 
 // ── Identity ────────────────────────────────────────────────────────────

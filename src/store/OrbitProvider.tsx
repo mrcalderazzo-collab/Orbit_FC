@@ -14,9 +14,12 @@ import {
 } from "react";
 import type {
   AiRec,
+  Channel,
+  ChatMessage,
   ChecklistItem,
   CommAudience,
   CommChannel,
+  CommVia,
   OrbitUser,
   Ticket,
   TicketComment,
@@ -50,6 +53,14 @@ interface OrbitState {
   assignTicket: (id: string, who: string) => void;
   setTicketStatus: (id: string, status: Ticket["status"]) => void;
   addTicketNote: (id: string, text: string) => void;
+  // ticket relationships
+  spawnChildTicket: (parentId: string, data: { title: string; type?: Ticket["type"]; prio?: Ticket["prio"] }) => string;
+  linkTickets: (aId: string, bId: string) => void;
+  mergeTickets: (sourceId: string, targetId: string) => void;
+  // the open full-screen Ticket Command workspace (so any view can open one)
+  commandId: string | null;
+  openCommand: (id: string) => void;
+  closeCommand: () => void;
   // communications
   ticketComments: Record<string, TicketComment[]>;
   seedComments: (tid: string, list: TicketComment[]) => void;
@@ -68,6 +79,10 @@ interface OrbitState {
   // shared ballots
   ballots: Record<string, Record<string, string>>;
   castBallot: (ticketId: string, memberName: string, bidId: string) => void;
+  // live chat (Communications)
+  chat: Record<string, ChatMessage[]>;
+  seedChat: (channelId: string, msgs: ChatMessage[]) => void;
+  sendChat: (channel: Channel, payload: { via: CommVia; text: string; toAll?: boolean }) => void;
   // toast
   toast: Toast;
   notify: (msg: string, kind?: "ok" | "err") => void;
@@ -95,7 +110,11 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [ticketMessages, setTicketMessages] = useState<Record<string, TicketMessage[]>>({});
   const [ticketProgress, setTicketProgress] = useState<Record<string, { items: ChecklistItem[] }>>({});
   const [ballots, setBallots] = useState<Record<string, Record<string, string>>>({});
+  const [chat, setChat] = useState<Record<string, ChatMessage[]>>({});
+  const [commandId, setCommandId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const openCommand = useCallback((id: string) => setCommandId(id), []);
+  const closeCommand = useCallback(() => setCommandId(null), []);
 
   const currentUser = userById(userId);
   const role = currentUser && currentUser.persona === "operator" ? "pm" : currentUser?.persona ?? "pm";
@@ -144,6 +163,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       status: "Open",
       verified: false,
       created: new Date().toISOString(),
+      parentId: null,
+      linkedIds: [],
+      mergedInto: null,
       log: [logLine(me(), "Ticket created")],
       ...data,
     } as Ticket;
@@ -201,17 +223,86 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
   }, []);
 
+  // ── ticket relationships ──
+  const spawnChildTicket = useCallback<OrbitState["spawnChildTicket"]>((parentId, data) => {
+    const parent = TICKETS.concat([]).find((x) => x.id === parentId);
+    const id = nextTicketId();
+    let buildingId = parent?.building;
+    setTickets((ts) => {
+      const p = ts.find((x) => x.id === parentId);
+      buildingId = p?.building || buildingId || "b1";
+      const child: Ticket = {
+        id, title: data.title, building: buildingId, type: data.type || p?.type || "Maintenance",
+        prio: data.prio || p?.prio || "Normal", status: "Open", assignee: null, requester: "Subtask · " + parentId,
+        created: new Date().toISOString(), desc: "", verified: false, parentId, linkedIds: [], mergedInto: null,
+        log: [logLine(me(), "Spawned from " + parentId)],
+      };
+      const withParentNote = ts.map((x) => x.id === parentId ? { ...x, log: [...x.log, logLine(me(), "Subtask → " + id + " · " + data.title)] } : x);
+      return [child, ...withParentNote];
+    });
+    notify(id + " created from " + parentId);
+    return id;
+  }, [me, notify]);
+
+  const linkTickets = useCallback((aId: string, bId: string) => {
+    setTickets((ts) => ts.map((t) => {
+      if (t.id === aId) return { ...t, linkedIds: [...new Set([...(t.linkedIds || []), bId])], log: [...t.log, logLine(me(), "Linked to " + bId)] };
+      if (t.id === bId) return { ...t, linkedIds: [...new Set([...(t.linkedIds || []), aId])] };
+      return t;
+    }));
+    notify(aId + " ⇄ " + bId + " linked");
+  }, [me, notify]);
+
+  const mergeTickets = useCallback((sourceId: string, targetId: string) => {
+    setTickets((ts) => ts.map((t) => {
+      if (t.id === sourceId) return { ...t, mergedInto: targetId, status: "Closed", verified: true, log: [...t.log, logLine(me(), "Merged into " + targetId + " as duplicate")] };
+      if (t.id === targetId) return { ...t, linkedIds: [...new Set([...(t.linkedIds || []), sourceId])], log: [...t.log, logLine(me(), "Absorbed duplicate " + sourceId)] };
+      return t;
+    }));
+    notify(sourceId + " merged into " + targetId);
+  }, [me, notify]);
+
+  // ── live chat ──
+  const seedChat = useCallback((channelId: string, msgs: ChatMessage[]) => {
+    setChat((s) => (s[channelId] ? s : { ...s, [channelId]: msgs }));
+  }, []);
+
+  const sendChat = useCallback<OrbitState["sendChat"]>((channel, payload) => {
+    const msg: ChatMessage = { id: "m" + Date.now(), channelId: channel.id, senderId: "me", via: payload.via, text: payload.text, at: stamp(), toAll: payload.toAll };
+    setChat((s) => ({ ...s, [channel.id]: [...(s[channel.id] || []), msg] }));
+    if (channel.ticketId) {
+      setTickets((ts) => ts.map((t) => t.id === channel.ticketId ? { ...t, log: [...t.log, logLine(me(), "Message → " + channel.title + " · " + payload.via)] } : t));
+    }
+    // light simulated reply so the surface feels alive
+    const repliers = channel.participants;
+    if (repliers.length) {
+      const who = repliers[Math.floor(Math.random() * repliers.length)];
+      const acks = channel.kind === "board"
+        ? ["Noted, thanks.", "Sounds good.", "Agreed — keep us posted.", "👍 on the award."]
+        : channel.kind === "vendor"
+          ? ["Copy that.", "On it — will confirm.", "Received, thanks."]
+          : ["Thank you!", "Got it, appreciate the update.", "Okay, sounds good.", "Thanks — I'll be around."];
+      const ack = acks[Math.floor(Math.random() * acks.length)];
+      window.setTimeout(() => {
+        setChat((s) => ({ ...s, [channel.id]: [...(s[channel.id] || []), { id: "r" + Date.now(), channelId: channel.id, senderId: who.id, via: payload.via, text: ack, at: stamp() }] }));
+      }, 1400);
+    }
+  }, [me]);
+
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
     theme, setTheme,
     tickets, createTicket, assignTicket, setTicketStatus, addTicketNote,
+    spawnChildTicket, linkTickets, mergeTickets,
+    commandId, openCommand, closeCommand,
     ticketComments, seedComments, addComment,
     ticketMessages, seedMessages, sendTicketMessage,
     ticketProgress, seedProgress, setProgressItems, postProgress,
     recs, decideRec,
     ballots, castBallot,
+    chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, ballots, castBallot, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

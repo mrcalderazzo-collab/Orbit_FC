@@ -17,6 +17,7 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
   ] },
   { sec: "Operations", items: [
     { id: "tickets", label: "Work Tickets", icon: "ticket", badge: "open" },
+    { id: "comms", label: "Comms", icon: "messages-square" },
     { id: "buildings", label: "Buildings", icon: "building-2" },
     { id: "notices", label: "Notices", icon: "megaphone" },
   ] },

@@ -3,6 +3,7 @@ import { Login } from "@/features/auth/Login";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Toast } from "@/components/shell/TopBar";
 import { TicketsPage } from "@/features/tickets/TicketsPage";
+import { CommsPage } from "@/features/comms/CommsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
 
@@ -12,6 +13,8 @@ function CurrentPage() {
   switch (route.page) {
     case "tickets":
       return <TicketsPage />;
+    case "comms":
+      return <CommsPage />;
     case "ai":
       return <AIReviewPage />;
     case "dashboard":

@@ -4,15 +4,21 @@ import type { Bid, Building, StageKey, Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { moneyFull, moneyShort } from "@/lib/format";
 import { PEOPLE } from "@/data/seed";
+import { useState } from "react";
 import { Avatar, Btn, Glass, Icon, KV, SectionLabel } from "@/components/ui";
-import { ProgressPanel } from "../ProgressPanel";
+import { SubtasksPanel } from "../SubtasksPanel";
+import { LinkMergeModal } from "../LinkMergeModal";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 const ASSIGNEES = ["luke", "cait", "maura", "gidi"];
 
 export function Overview({ t, b, f, onTab }: { t: Ticket; b: Building; f: TicketFlow; onTab: (k: string) => void }) {
-  const { assignTicket } = useOrbit();
+  const { assignTicket, tickets, openCommand } = useOrbit();
+  const [relModal, setRelModal] = useState(false);
+  const parent = t.parentId ? tickets.find((x) => x.id === t.parentId) : null;
+  const linked = (t.linkedIds || []).map((id) => tickets.find((x) => x.id === id)).filter(Boolean) as Ticket[];
+  const children = tickets.filter((x) => x.parentId === t.id);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -23,7 +29,7 @@ export function Overview({ t, b, f, onTab }: { t: Ticket; b: Building; f: Ticket
           </p>
         </Glass>
 
-        <ProgressPanel t={t} f={f} />
+        <SubtasksPanel t={t} f={f} />
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <NextActionCard f={f} onTab={onTab} />
@@ -98,9 +104,38 @@ export function Overview({ t, b, f, onTab }: { t: Ticket; b: Building; f: Ticket
           </div>
         </Glass>
 
+        <Glass style={{ padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
+            <SectionLabel>Relationships</SectionLabel>
+            <button onClick={() => setRelModal(true)} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--acc-text)", fontFamily: MONO, fontSize: 10 }}><Icon name="link" size={11} color="var(--acc-text)" />LINK / MERGE</button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {parent && <RelRow icon="corner-left-up" label={"Subtask of"} t={parent} onOpen={openCommand} />}
+            {children.map((c) => <RelRow key={c.id} icon="git-branch" label="Child" t={c} onOpen={openCommand} />)}
+            {linked.map((c) => <RelRow key={c.id} icon="link" label="Linked" t={c} onOpen={openCommand} />)}
+            {!parent && !children.length && !linked.length && (
+              <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-5)", letterSpacing: "0.04em" }}>No related tickets. Spawn a subtask above, or link/merge a duplicate.</span>
+            )}
+          </div>
+        </Glass>
+
         <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", padding: "0 4px" }}>{b.name} · {b.code}</span>
       </div>
+      {relModal && <LinkMergeModal ticket={t} onClose={() => setRelModal(false)} />}
     </div>
+  );
+}
+
+function RelRow({ icon, label, t, onOpen }: { icon: string; label: string; t: Ticket; onOpen: (id: string) => void }) {
+  return (
+    <button onClick={() => onOpen(t.id)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 9, cursor: "pointer", background: "var(--fill-1)", border: "1px solid var(--hair-2)", textAlign: "left" }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--hair-strong)")}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--hair-2)")}>
+      <Icon name={icon} size={13} color="var(--ink-4)" />
+      <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.08em", color: "var(--ink-4)", textTransform: "uppercase", width: 54, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--acc-text)" }}>{t.id}</span>
+      <span style={{ flex: 1, minWidth: 0, fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+    </button>
   );
 }
 
