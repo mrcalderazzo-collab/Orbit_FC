@@ -5,9 +5,10 @@
 import { useState, type ReactNode } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { PERSONA_META, USERS, userPerson } from "@/data/identity";
-import { Avatar, Icon } from "@/components/ui";
+import { Avatar, Icon, SectionLabel } from "@/components/ui";
 import { OrbitWordmark } from "@/components/shell/Wordmark";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
+import { NotificationBell } from "@/components/shell/NotificationBell";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -30,9 +31,11 @@ export function PortalShell({
   toolbar?: ReactNode;
 }) {
   const { currentUser } = useOrbit();
+  const [tiles, setTiles] = useState(false);
   if (!currentUser) return null;
   const p = userPerson(currentUser);
   const meta = PERSONA_META[currentUser.persona];
+  const pick = (id: string) => { onSelect(id); setTiles(false); };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", minHeight: 0 }}>
@@ -45,7 +48,8 @@ export function PortalShell({
             <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: accent }}>{meta.label} portal</span>
           </span>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <NotificationBell />
           <ThemeSwitcher />
           <AccountMenu accent={accent} />
         </div>
@@ -69,9 +73,12 @@ export function PortalShell({
         })}
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12, paddingRight: 4 }}>
           {toolbar}
+          <button onClick={() => setTiles((t) => !t)} title={tiles ? "List view" : "Tile view"} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 28, borderRadius: 9, cursor: "pointer", background: tiles ? accent + "1a" : "var(--fill-2)", border: "1px solid " + (tiles ? accent + "44" : "var(--hair-3)") }}>
+            <Icon name={tiles ? "rows-3" : "layout-grid"} size={15} color={tiles ? accent : "var(--ink-4)"} />
+          </button>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <Avatar person={p!} size={24} />
-            <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.role}</span>
+            <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p?.role}</span>
           </span>
         </span>
       </nav>
@@ -79,8 +86,31 @@ export function PortalShell({
       {/* content */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "26px 24px 60px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
-          {children}
+          {tiles ? <TileGrid tabs={tabs} accent={accent} onPick={pick} /> : children}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function TileGrid({ tabs, accent, onPick }: { tabs: PortalTab[]; accent: string; onPick: (id: string) => void }) {
+  return (
+    <div>
+      <SectionLabel style={{ marginBottom: 14 }}>Everything in one place</SectionLabel>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14 }}>
+        {tabs.map((t) => (
+          <button key={t.id} onClick={() => onPick(t.id)} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 12, padding: 18, borderRadius: 18, cursor: "pointer", textAlign: "left", background: "var(--panel)", border: "1px solid var(--hair)", transition: "border-color .15s, transform .12s" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--hair)"; e.currentTarget.style.transform = "translateY(0)"; }}>
+            <span style={{ width: 46, height: 46, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", background: accent + "18", border: "1px solid " + accent + "3a" }}>
+              <Icon name={t.icon} size={22} color={accent} />
+            </span>
+            <span style={{ fontFamily: SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{t.label}</span>
+            {t.badge ? (
+              <span style={{ position: "absolute", top: 14, right: 14, minWidth: 20, height: 20, padding: "0 6px", borderRadius: 99, background: accent, color: "var(--on-accent, #0a0a0a)", fontFamily: MONO, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>
+            ) : null}
+          </button>
+        ))}
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ import type {
 } from "@/lib/types";
 import { stamp } from "@/lib/format";
 import { addDaysISO, todayISO } from "@/lib/focus";
-import { AI_RECS, PEOPLE, TICKETS } from "@/data/seed";
+import { AI_RECS, PEOPLE, TICKETS, buildingById } from "@/data/seed";
 import { ticketFlow } from "@/data/flow";
 import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoStageKey } from "@/data/workorders";
 import { WO_STAGES } from "@/data/workorders";
@@ -47,6 +47,14 @@ const SEED_CALENDAR: BuildingEvent[] = [
   { id: "cal4", buildingId: "b3", title: "Roof drain clearing before storm", kind: "Maintenance", at: addDaysISO(1) + "T08:00", by: "Tony Calabrese", source: "super", ticketId: "T-4779" },
 ];
 
+// a few notifications so the bell has live-looking history on first load
+const SEED_NOTIFS: OrbitNotification[] = [
+  { id: "nts1", at: "09:42", kind: "ticket", title: "Otis on-site at Vesper House", detail: "Diego logged progress on T-4801 — isolating the sensor board.", building: "b2", ref: { page: "tickets", id: "T-4801" }, read: false },
+  { id: "nts2", at: "08:55", kind: "vote", title: "Board vote nearing quorum", detail: "The Ardsley · bylaw counsel item is one vote from quorum.", building: "b6", ref: { page: "tickets", id: "T-4782" }, read: false },
+  { id: "nts3", at: "08:30", kind: "finance", title: "Invoice approved for payment", detail: "Northeast Mechanical · cooling-tower service.", building: "b2", read: true },
+  { id: "nts4", at: "Yesterday", kind: "message", title: "New resident reply", detail: "Sutton Reach 3R replied on the intercom request.", building: "b5", ref: { page: "comms" }, read: true },
+];
+
 export type ThemeName = "dark" | "light" | "clear";
 export type Route = { page: string; id: string | null };
 export type Toast = { msg: string; kind: "ok" | "err"; t: number } | null;
@@ -57,6 +65,9 @@ export interface Shift { id: string; userId: string; building: string; in: strin
 export interface BuildingEvent { id: string; buildingId: string; title: string; kind: string; at: string; by: string; source: "super" | "office"; note?: string; ticketId?: string }
 /** a photo attached to a ticket from the field */
 export interface TicketPhoto { id: string; url: string; caption: string; by: string; at: string }
+/** a real-time activity notification */
+export type NotifKind = "ticket" | "vote" | "message" | "finance" | "calendar" | "system";
+export interface OrbitNotification { id: string; at: string; kind: NotifKind; title: string; detail?: string; building?: string; ref?: { page?: string; id?: string }; read: boolean }
 
 let _tid = 4802;
 const nextTicketId = () => "T-" + _tid++;
@@ -124,6 +135,11 @@ interface OrbitState {
   // field photos on a ticket
   ticketPhotos: Record<string, TicketPhoto[]>;
   addTicketPhoto: (ticketId: string, caption: string) => void;
+  // real-time notifications
+  notifications: OrbitNotification[];
+  pushNotification: (n: Omit<OrbitNotification, "id" | "at" | "read"> & { at?: string }) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
   // work orders (vendor ↔ ticket ↔ invoice ↔ payment)
   workOrders: Record<string, WorkOrder>;
   ensureWorkOrder: (t: Ticket) => void;
@@ -166,6 +182,13 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [calendar, setCalendar] = useState<BuildingEvent[]>(() => SEED_CALENDAR.map((e) => ({ ...e })));
   const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
+  const [notifications, setNotifications] = useState<OrbitNotification[]>(() => SEED_NOTIFS.map((n) => ({ ...n })));
+  let _nid = 0;
+  const pushNotification = useCallback<OrbitState["pushNotification"]>((n) => {
+    setNotifications((ns) => [{ ...n, id: "nt" + Date.now() + (_nid++), at: n.at || stamp(), read: false }, ...ns].slice(0, 60));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const markNotificationRead = useCallback((id: string) => setNotifications((ns) => ns.map((n) => (n.id === id ? { ...n, read: true } : n))), []);
+  const markAllNotificationsRead = useCallback(() => setNotifications((ns) => ns.map((n) => ({ ...n, read: true }))), []);
   const [workOrders, setWorkOrders] = useState<Record<string, WorkOrder>>(() => seedWorkOrders(TICKETS, ticketFlow));
   const [chat, setChat] = useState<Record<string, ChatMessage[]>>({});
   const [commandId, setCommandId] = useState<string | null>(null);
@@ -228,8 +251,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     } as Ticket;
     setTickets((ts) => [t, ...ts]);
     notify(id + " created");
+    pushNotification({ kind: "ticket", title: "New ticket · " + (data.title || id), detail: (buildingById(data.building)?.name ?? data.building) + " · from " + (data.requester || "intake"), building: data.building, ref: { page: "tickets", id } });
     return id;
-  }, [me, notify]);
+  }, [me, notify, pushNotification]);
 
   const assignTicket = useCallback((id: string, who: string) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, assignee: who, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine("nick", "Assigned to " + (PEOPLE[who]?.name || who))] } : t));
@@ -237,7 +261,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   const setTicketStatus = useCallback((id: string, status: Ticket["status"]) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, status, verified: status === "Closed" ? true : t.verified, log: [...t.log, logLine("nick", "Status → " + status)] } : t));
-  }, []);
+    const t = TICKETS.find((x) => x.id === id);
+    pushNotification({ kind: "ticket", title: id + " → " + status, detail: t?.title, building: t?.building, ref: { page: "tickets", id } });
+  }, [pushNotification]);
 
   const addTicketNote = useCallback((id: string, text: string) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, log: [...t.log, logLine(me(), text)] } : t));
@@ -314,7 +340,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   const castBallot = useCallback((ticketId: string, memberName: string, bidId: string) => {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
-  }, []);
+    pushNotification({ kind: "vote", title: "Board vote cast", detail: memberName + " voted on " + ticketId, ref: { page: "tickets", id: ticketId } });
+  }, [pushNotification]);
 
   // ── payroll time-clock ──
   const activeShift = useCallback((uid: string) => shifts.find((s) => s.userId === uid && !s.out) || null, [shifts]);
@@ -335,7 +362,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const addCalendarEvent = useCallback<OrbitState["addCalendarEvent"]>((e) => {
     setCalendar((cs) => [...cs, { ...e, id: "cal" + Date.now(), by: e.by ?? userName(currentUser), source: e.source ?? "super" }]);
     notify("Added to building calendar");
-  }, [currentUser, notify]);
+    pushNotification({ kind: "calendar", title: "Calendar · " + e.title, detail: e.kind + (e.by ? " · " + (e.by ?? userName(currentUser)) : ""), building: e.buildingId });
+  }, [currentUser, notify, pushNotification]);
 
   // ── field photos ──
   const addTicketPhoto = useCallback((ticketId: string, caption: string) => {
@@ -379,7 +407,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       return { ...wos, [ticketId]: { ...w, invoice, stage: "invoiced", log: [...w.log, logLine(me(), "Invoice " + inv.number + " received · $" + inv.amount.toLocaleString())] } };
     });
     notify("Invoice " + inv.number + " logged");
-  }, [me, notify]);
+    pushNotification({ kind: "finance", title: "Invoice received · " + inv.number, detail: "$" + inv.amount.toLocaleString(), ref: { page: "finance" } });
+  }, [me, notify, pushNotification]);
 
   const setInvoiceStatus = useCallback((ticketId: string, status: Invoice["status"]) => {
     setWorkOrders((wos) => {
@@ -473,10 +502,11 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     shifts, activeShift, punchIn, punchOut,
     calendar, addCalendarEvent,
     ticketPhotos, addTicketPhoto,
+    notifications, pushNotification, markNotificationRead, markAllNotificationsRead,
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

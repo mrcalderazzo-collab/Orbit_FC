@@ -1,21 +1,23 @@
 // Super Today — the superintendent's home base: who they are on this building,
 // what needs hands today, and who's coming on site. Read-only summary; actions
 // live in the Work tab. Scoped to their building.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { superTickets } from "@/data/identity";
-import { buildingById } from "@/data/seed";
+import { buildingById, PEOPLE } from "@/data/seed";
 import { superByBuilding } from "@/data/supers";
 import { BUILDING_SYSTEMS, SITE_VISITS } from "@/data/buildings";
 import { Btn, Glass, Icon, PrioDot, SectionLabel, Tag } from "@/components/ui";
+import { SuperVisitDetail, type VisitInfo } from "./SuperVisitDetail";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 const TEAL = "#14b8a6";
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export function SuperToday({ buildingId, go, onCreate }: { buildingId: string; go: (id: string) => void; onCreate: () => void }) {
+export function SuperToday({ buildingId, go, onCreate, onOpenTask }: { buildingId: string; go: (id: string) => void; onCreate: () => void; onOpenTask: (id: string) => void }) {
   const { currentUser, tickets } = useOrbit();
+  const [visit, setVisit] = useState<VisitInfo | null>(null);
   const b = buildingById(buildingId);
   const sup = superByBuilding(buildingId);
   const work = useMemo(() => superTickets(buildingId, tickets), [buildingId, tickets]);
@@ -80,8 +82,9 @@ export function SuperToday({ buildingId, go, onCreate }: { buildingId: string; g
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visits.map((v) => {
               const c = v.status === "Scheduled" ? "#3b82f6" : "#f59e0b";
+              const info: VisitInfo = { title: v.title, kind: v.purpose, when: v.startsAt, lead: PEOPLE[v.lead]?.name, areas: v.areas, agenda: v.agenda, attendees: v.attendees, note: v.notes, ticketId: v.relatedTicketId };
               return (
-                <div key={v.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 13px", borderRadius: 12, background: "var(--fill-1)", border: "1px solid var(--hair-2)" }}>
+                <button key={v.id} onClick={() => setVisit(info)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 12, background: "var(--fill-1)", border: "1px solid var(--hair-2)", cursor: "pointer", textAlign: "left", width: "100%" }}>
                   <span style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: c + "1a" }}>
                     <Icon name={v.purpose === "Vendor walk" ? "hard-hat" : v.purpose === "Inspection" ? "clipboard-check" : "footprints"} size={16} color={c} />
                   </span>
@@ -93,7 +96,8 @@ export function SuperToday({ buildingId, go, onCreate }: { buildingId: string; g
                     <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginTop: 3 }}>{fmtDateTime(v.startsAt)}</div>
                     {v.areas.length > 0 && <div style={{ fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>Areas: {v.areas.join(" · ")}</div>}
                   </div>
-                </div>
+                  <Icon name="chevron-right" size={16} color="var(--ink-4)" />
+                </button>
               );
             })}
           </div>
@@ -125,6 +129,8 @@ export function SuperToday({ buildingId, go, onCreate }: { buildingId: string; g
           )}
         </Glass>
       )}
+
+      {visit && <SuperVisitDetail info={visit} onClose={() => setVisit(null)} onOpenTask={onOpenTask} />}
     </div>
   );
 }

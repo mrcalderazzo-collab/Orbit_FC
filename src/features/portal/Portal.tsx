@@ -214,14 +214,14 @@ function VendorPage({ tab }: { tab: string }) {
 
 function SuperPage({ tab, buildingId, go, onCreate, onOpenTask }: { tab: string; buildingId: string; go: (id: string) => void; onCreate: (p?: CreatePrefill) => void; onOpenTask: (id: string) => void }) {
   switch (tab) {
-    case "today": return <SuperToday buildingId={buildingId} go={go} onCreate={() => onCreate()} />;
+    case "today": return <SuperToday buildingId={buildingId} go={go} onCreate={() => onCreate()} onOpenTask={onOpenTask} />;
     case "work": return <SuperWork buildingId={buildingId} onCreate={() => onCreate()} onOpenTask={onOpenTask} />;
-    case "schedule": return <SuperSchedule buildingId={buildingId} go={go} />;
+    case "schedule": return <SuperSchedule buildingId={buildingId} go={go} onOpenTask={onOpenTask} />;
     case "calendar": return <SuperCalendar buildingId={buildingId} />;
     case "walkthrough": return <SuperWalkthrough buildingId={buildingId} go={go} />;
     case "systems": return <SuperSystems buildingId={buildingId} onCreate={onCreate} />;
     case "directline": return <DirectLinePanel heading="Direct line" opener="Hi — it's your account manager at Orbit. Loop me in on anything from the field: vendors, access, parts, or building issues. I'm here." />;
-    default: return <SuperToday buildingId={buildingId} go={go} onCreate={() => onCreate()} />;
+    default: return <SuperToday buildingId={buildingId} go={go} onCreate={() => onCreate()} onOpenTask={onOpenTask} />;
   }
 }
 

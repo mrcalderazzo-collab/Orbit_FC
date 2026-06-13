@@ -38,6 +38,12 @@ Sign in as **Marcus Webb** for the full operator view.
 
 ## 3. Stack
 - React 18 + TypeScript + Vite + TailwindCSS (theme tokens) + Lucide icons.
+- **Real-time notifications:** `OrbitProvider.notifications` + `pushNotification` (wired into
+  create/status/vote/calendar/invoice actions); shared `NotificationBell` (unread badge +
+  dropdown) lives in the operator TopBar and the PortalShell. Operator clicks navigate.
+- **Portals** support a **tile/list view toggle** (PortalShell) — a launcher grid of all the
+  persona's sections. Super **Calendar** has **Day / Week / Month** views; "who's coming"
+  items and calendar entries open a **visit detail** (vendor + COI + scope + linked ticket).
 - Leaflet (real map view; theme-aware Carto basemap tiles, no API key) — used by the
   Buildings Map view. Building geo + photos live in `data/buildings.ts`.
 - State: a typed React context, `src/store/OrbitProvider.tsx`. **Its action surface is

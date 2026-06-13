@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useOrbit, type ThemeName } from "@/store/OrbitProvider";
 import { portfolioTotals } from "@/data/seed";
 import { Icon } from "@/components/ui";
+import { NotificationBell } from "./NotificationBell";
 
 const MONO = "'JetBrains Mono', monospace";
 const SANS = "Outfit, sans-serif";
@@ -32,6 +33,7 @@ export function ThemeSwitcher() {
 
 export function TopBar({ title, sub, right }: { title: string; sub?: ReactNode; right?: ReactNode }) {
   const t = portfolioTotals();
+  const { nav, openCommand } = useOrbit();
   return (
     <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, padding: "22px 28px 18px", borderBottom: "1px solid var(--hair-2)" }}>
       <div>
@@ -40,6 +42,7 @@ export function TopBar({ title, sub, right }: { title: string; sub?: ReactNode; 
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {right}
+        <NotificationBell onNavigate={(n) => { if (n.ref?.page === "tickets" && n.ref.id) openCommand(n.ref.id); else if (n.ref?.page) nav(n.ref.page); }} />
         <ThemeSwitcher />
         <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "8px 16px", borderRadius: 99, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
           {([["NODES", t.buildings + " BLDG"], ["UNITS", t.units], ["UPLINK", "SECURE"]] as const).map(([l, v], i) => (
