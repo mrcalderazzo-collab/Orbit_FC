@@ -28,6 +28,10 @@ import type {
 import { stamp } from "@/lib/format";
 import { addDaysISO, todayISO } from "@/lib/focus";
 import { AI_RECS, PEOPLE, TICKETS } from "@/data/seed";
+import { ticketFlow } from "@/data/flow";
+import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoStageKey } from "@/data/workorders";
+import { WO_STAGES } from "@/data/workorders";
+import { SEED_NOTICES, type Notice } from "@/data/notices";
 import { userById, userName } from "@/data/identity";
 
 // a few do-dates so the Focus board has content on first load
@@ -88,9 +92,19 @@ interface OrbitState {
   recs: AiRec[];
   decideRec: (id: string, decision: "approved" | "rejected") => void;
   addRecs: (recs: AiRec[]) => void;
+  // notices (building broadcasts)
+  notices: Notice[];
+  sendNotice: (n: Omit<Notice, "id" | "at"> & { at?: string }) => void;
   // shared ballots
   ballots: Record<string, Record<string, string>>;
   castBallot: (ticketId: string, memberName: string, bidId: string) => void;
+  // work orders (vendor ↔ ticket ↔ invoice ↔ payment)
+  workOrders: Record<string, WorkOrder>;
+  ensureWorkOrder: (t: Ticket) => void;
+  setWoStage: (ticketId: string, stage: WoStageKey, note?: string) => void;
+  recordInvoice: (ticketId: string, inv: { number: string; amount: number; dueDate: string }) => void;
+  setInvoiceStatus: (ticketId: string, status: Invoice["status"]) => void;
+  addWoLog: (ticketId: string, text: string) => void;
   // live chat (Communications)
   chat: Record<string, ChatMessage[]>;
   seedChat: (channelId: string, msgs: ChatMessage[]) => void;
@@ -118,10 +132,12 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   });
   const [tickets, setTickets] = useState<Ticket[]>(() => TICKETS.map((t) => ({ ...t, workDate: SEED_WORK_DATES[t.id] ?? null })));
   const [recs, setRecs] = useState<AiRec[]>(() => AI_RECS.map((r) => ({ ...r })));
+  const [notices, setNotices] = useState<Notice[]>(() => SEED_NOTICES.map((n) => ({ ...n })));
   const [ticketComments, setTicketComments] = useState<Record<string, TicketComment[]>>({});
   const [ticketMessages, setTicketMessages] = useState<Record<string, TicketMessage[]>>({});
   const [ticketProgress, setTicketProgress] = useState<Record<string, { items: ChecklistItem[] }>>({});
   const [ballots, setBallots] = useState<Record<string, Record<string, string>>>({});
+  const [workOrders, setWorkOrders] = useState<Record<string, WorkOrder>>(() => seedWorkOrders(TICKETS, ticketFlow));
   const [chat, setChat] = useState<Record<string, ChatMessage[]>>({});
   const [commandId, setCommandId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -261,9 +277,61 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const sendNotice = useCallback<OrbitState["sendNotice"]>((n) => {
+    const at = n.at || (n.status === "Scheduled" ? "Scheduled" : new Date().toISOString().slice(0, 16).replace("T", " "));
+    setNotices((ns) => [{ ...n, id: "n" + Date.now(), at }, ...ns]);
+    notify(n.status === "Scheduled" ? "Notice scheduled · " + n.reach + " residents" : n.status === "Draft" ? "Draft saved" : "Notice sent to " + n.reach + " residents");
+  }, [notify]);
+
   const castBallot = useCallback((ticketId: string, memberName: string, bidId: string) => {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
   }, []);
+
+  // ── work orders ──
+  const ensureWorkOrder = useCallback((t: Ticket) => {
+    setWorkOrders((wos) => {
+      if (wos[t.id]) return wos;
+      const f = ticketFlow(t);
+      if (!f.awarded) return wos;
+      const seq = Object.values(wos).filter((w) => w.buildingId === t.building).length + 1;
+      return { ...wos, [t.id]: deriveWorkOrder(t, f, seq) };
+    });
+  }, []);
+
+  const setWoStage = useCallback((ticketId: string, stage: WoStageKey, note?: string) => {
+    const label = WO_STAGES.find((s) => s.key === stage)?.label || stage;
+    setWorkOrders((wos) => {
+      const w = wos[ticketId];
+      if (!w) return wos;
+      return { ...wos, [ticketId]: { ...w, stage, log: [...w.log, logLine(me(), note || "Stage → " + label)] } };
+    });
+    setTickets((ts) => ts.map((t) => t.id === ticketId ? { ...t, log: [...t.log, logLine(me(), "Work order → " + label)] } : t));
+  }, [me]);
+
+  const addWoLog = useCallback((ticketId: string, text: string) => {
+    setWorkOrders((wos) => { const w = wos[ticketId]; return w ? { ...wos, [ticketId]: { ...w, log: [...w.log, logLine(me(), text)] } } : wos; });
+  }, [me]);
+
+  const recordInvoice = useCallback((ticketId: string, inv: { number: string; amount: number; dueDate: string }) => {
+    setWorkOrders((wos) => {
+      const w = wos[ticketId];
+      if (!w) return wos;
+      const invoice: Invoice = { number: inv.number, amount: inv.amount, receivedAt: todayISO(), dueDate: inv.dueDate, status: "received" };
+      return { ...wos, [ticketId]: { ...w, invoice, stage: "invoiced", log: [...w.log, logLine(me(), "Invoice " + inv.number + " received · $" + inv.amount.toLocaleString())] } };
+    });
+    notify("Invoice " + inv.number + " logged");
+  }, [me, notify]);
+
+  const setInvoiceStatus = useCallback((ticketId: string, status: Invoice["status"]) => {
+    setWorkOrders((wos) => {
+      const w = wos[ticketId];
+      if (!w || !w.invoice) return wos;
+      const stage: WoStageKey = status === "paid" ? "paid" : w.stage;
+      const txt = status === "approved" ? "Invoice " + w.invoice.number + " approved for payment" : status === "paid" ? "Payment released · " + w.invoice.number + " marked paid" : "Invoice updated";
+      return { ...wos, [ticketId]: { ...w, stage, invoice: { ...w.invoice, status }, log: [...w.log, logLine(me(), txt)] } };
+    });
+    notify(status === "paid" ? "Marked paid" : status === "approved" ? "Invoice approved" : "Updated");
+  }, [me, notify]);
 
   // ── ticket relationships ──
   const spawnChildTicket = useCallback<OrbitState["spawnChildTicket"]>((parentId, data) => {
@@ -341,10 +409,12 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     ticketMessages, seedMessages, sendTicketMessage,
     ticketProgress, seedProgress, setProgressItems, postProgress,
     recs, decideRec, addRecs,
+    notices, sendNotice,
     ballots, castBallot,
+    workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, ballots, castBallot, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

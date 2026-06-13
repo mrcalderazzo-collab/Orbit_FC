@@ -113,26 +113,21 @@ export function FocusBoard({ tickets, flowMap, onOpen }: { tickets: Ticket[]; fl
                 {items.map((t) => {
                   const b = bldg(t.building);
                   return (
-                    <div key={t.id} onClick={() => onOpen(t.id)} style={{ display: "flex", alignItems: "center", gap: 13, padding: "11px 12px", cursor: "pointer", borderRadius: 10, borderLeft: "2px solid transparent" }}
+                    <div key={t.id} onClick={() => onOpen(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", cursor: "pointer", borderRadius: 10, borderLeft: "2px solid transparent" }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = "var(--fill-1)"; e.currentTarget.style.borderLeftColor = PRIO_COLOR[t.prio]; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderLeftColor = "transparent"; }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 2, background: PRIO_COLOR[t.prio], flexShrink: 0, boxShadow: t.prio === "Critical" ? "0 0 7px " + PRIO_COLOR[t.prio] : "none" }} />
-                      <span style={{ fontFamily: MONO, fontSize: 10.5, color: "var(--ink-3)", width: 52, flexShrink: 0 }}>{t.id}</span>
+                      <span title={t.prio} style={{ width: 7, height: 7, borderRadius: 2, background: PRIO_COLOR[t.prio], flexShrink: 0, boxShadow: t.prio === "Critical" ? "0 0 7px " + PRIO_COLOR[t.prio] : "none" }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                          <span style={{ fontFamily: SANS, fontSize: 13.5, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
-                          {g.key === "reply" && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#3b82f6", background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "1px 6px", borderRadius: 5 }}><Icon name="reply" size={9} color="#3b82f6" />REPLY</span>}
-                        </div>
-                        <span style={{ fontFamily: MONO, fontSize: 9, color: b.mono }}>{b.name} · {t.requester}</span>
+                        <span style={{ fontFamily: SANS, fontSize: 13.5, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{t.title}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}><span style={{ color: b.mono }}>{b.name}</span> · {t.id}</span>
                       </div>
-                      <span style={{ width: 110, flexShrink: 0 }}><StatusTag status={t.status} /></span>
-                      {flowMap[t.id] && <SlaChipMini f={flowMap[t.id]} />}
+                      {g.key === "reply" && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#3b82f6", background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "2px 7px", borderRadius: 6 }}><Icon name="reply" size={9} color="#3b82f6" />REPLY</span>}
                       <span onClick={(e) => e.stopPropagation()}><DoDateMenu id={t.id} date={t.workDate} compact /></span>
-                      <span style={{ width: 26, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>{t.assignee ? <Avatar person={t.assignee} size={22} /> : <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--ink-5)" }} />}</span>
+                      <span style={{ width: 24, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>{t.assignee ? <Avatar person={t.assignee} size={22} /> : <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--ink-5)" }} />}</span>
                     </div>
                   );
                 })}
-                {!items.length && <div style={{ padding: "10px 14px", fontFamily: MONO, fontSize: 9.5, color: "var(--ink-5)", letterSpacing: "0.06em" }}>— CLEAR —</div>}
+                {!items.length && <div style={{ padding: "9px 14px", fontFamily: MONO, fontSize: 9, color: "var(--ink-5)", letterSpacing: "0.06em" }}>— CLEAR —</div>}
               </div>
             )}
           </div>

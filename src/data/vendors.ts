@@ -5,6 +5,7 @@ import { addDaysISO, todayISO } from "@/lib/focus";
 
 export interface Vendor {
   id: string;
+  code: string; // human vendor ID, e.g. V-004
   name: string;
   trades: string[];
   grade: number; // 0–100
@@ -17,7 +18,7 @@ export interface Vendor {
 }
 
 // COI dates are relative to "today" so the demo always shows live expiry states.
-export const VENDORS: Vendor[] = [
+const RAW_VENDORS: Omit<Vendor, "code">[] = [
   { id: "v_otis", name: "Otis Elevator", trades: ["Elevator", "Building Systems"], grade: 96, rating: 4.8, phone: "+1 (212) 555-0410", email: "dispatch@otis.example", coiExpiry: addDaysISO(220), responseHrs: 2, jobs: 31 },
   { id: "v_nemech", name: "Northeast Mechanical", trades: ["HVAC", "Cooling", "Maintenance"], grade: 94, rating: 4.7, phone: "+1 (917) 555-0188", email: "ops@nemech.example", coiExpiry: addDaysISO(58), responseHrs: 4, jobs: 47 },
   { id: "v_camleach", name: "Cambridge & Leach", trades: ["Boiler", "Heating", "Hot water"], grade: 88, rating: 4.5, phone: "+1 (646) 555-0119", email: "service@camleach.example", coiExpiry: addDaysISO(12), responseHrs: 4, jobs: 22 },
@@ -31,6 +32,8 @@ export const VENDORS: Vendor[] = [
   { id: "v_marks", name: "Marks Paneth CPA", trades: ["Finance", "Audit", "Forensic"], grade: 93, rating: 4.7, phone: "+1 (212) 555-0301", email: "advisory@markspaneth.example", coiExpiry: addDaysISO(410), responseHrs: 48, jobs: 6 },
   { id: "v_cohen", name: "Cohen & Associates Law", trades: ["Legal", "Governance", "Compliance"], grade: 95, rating: 4.8, phone: "+1 (212) 555-0355", email: "counsel@cohenlaw.example", coiExpiry: addDaysISO(512), responseHrs: 48, jobs: 5 },
 ];
+
+export const VENDORS: Vendor[] = RAW_VENDORS.map((v, i) => ({ ...v, code: "V-" + String(i + 1).padStart(3, "0") }));
 
 export type CoiStatus = "valid" | "expiring" | "expired";
 

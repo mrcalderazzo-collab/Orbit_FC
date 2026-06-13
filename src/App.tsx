@@ -6,6 +6,8 @@ import { TicketsPage } from "@/features/tickets/TicketsPage";
 import { TicketCommand } from "@/features/tickets/command/TicketCommand";
 import { CommsPage } from "@/features/comms/CommsPage";
 import { VendorsPage } from "@/features/vendors/VendorsPage";
+import { NoticesPage } from "@/features/notices/NoticesPage";
+import { FinancePage } from "@/features/finance/FinancePage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
 
@@ -26,7 +28,9 @@ function CurrentPage() {
     case "buildings":
       return <ComingSoon title="Buildings" icon="building-2" note="Directory → building detail: Overview, Building Systems with AI health prediction, Documents, Leases, People, Tickets, Audit Chain." />;
     case "notices":
-      return <ComingSoon title="Notices" icon="megaphone" note="Broadcast notices across Email · SMS · Push · In-app, with audience targeting and delivery status." />;
+      return <NoticesPage />;
+    case "finance":
+      return <FinancePage />;
     case "integrations":
       return <ComingSoon title="Integrations" icon="blocks" note="Connect Gmail, Slack, QuickBooks, DocuSign, Stripe and more — intake routing, ledger sync, e-signing." />;
     case "vendors":

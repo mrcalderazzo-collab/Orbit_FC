@@ -15,8 +15,8 @@ export const PERSONA_META: Record<Persona, { label: string; icon: string; tint: 
 
 export const USERS: OrbitUser[] = [
   { id: "u_marcus", persona: "operator", who: "nick", title: "Principal Operator", email: "m.webb@orbit.ops", scope: "All 8 buildings · full command", home: "dashboard", perms: ["all"] },
-  { id: "u_priya", persona: "operator", who: "cait", title: "Compliance & Admin", email: "p.anand@orbit.ops", scope: "Portfolio · compliance & finance", home: "tickets", perms: ["dashboard", "tickets", "comms", "buildings", "notices", "ai"] },
-  { id: "u_diego", persona: "operator", who: "luke", title: "Field Intelligence", email: "d.ramos@orbit.ops", scope: "Field queue · NYC Ops", home: "tickets", perms: ["tickets", "comms", "buildings", "emergencies"] },
+  { id: "u_priya", persona: "operator", who: "cait", title: "Compliance & Admin", email: "p.anand@orbit.ops", scope: "Portfolio · compliance & finance", home: "tickets", perms: ["dashboard", "tickets", "comms", "buildings", "notices", "finance", "ai"] },
+  { id: "u_diego", persona: "operator", who: "luke", title: "Field Intelligence", email: "d.ramos@orbit.ops", scope: "Field queue · NYC Ops", home: "tickets", perms: ["tickets", "comms", "buildings", "emergencies", "vendors"] },
   { id: "u_board", persona: "board", title: "Board President", building: "b6", email: "m.lieb@ardsleyboard.org", scope: "The Ardsley · approvals & finance", person: { name: "Mara Lieb", initials: "ML", color: "#a855f7", role: "Board President · The Ardsley" } },
   { id: "u_resident", persona: "resident", building: "b5", unit: "3R", email: "jordan.avery@email.com", scope: "Sutton Reach · Unit 3R", person: { name: "Jordan Avery", initials: "JA", color: "#3b82f6", role: "Resident · Sutton Reach 3R" } },
   { id: "u_vendor", persona: "vendor", company: "Northeast Mechanical", email: "dispatch@nemech.com", scope: "Northeast Mechanical · dispatch", person: { name: "Rosa Méndez", initials: "RM", color: "#f59e0b", role: "Dispatcher · Northeast Mechanical" } },

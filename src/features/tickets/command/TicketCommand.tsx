@@ -25,7 +25,7 @@ const TABS: [string, string, string][] = [
   ["overview", "Overview", "layout-dashboard"],
   ["intake", "Intake", "inbox"],
   ["sourcing", "Bids & Vote", "vote"],
-  ["vendor", "Vendor & Schedule", "calendar-check"],
+  ["vendor", "Vendor & Work Order", "clipboard-list"],
   ["comms", "Communications", "messages-square"],
   ["activity", "Activity", "history"],
 ];
