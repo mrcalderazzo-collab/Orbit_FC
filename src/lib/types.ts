@@ -2,7 +2,7 @@
 // the seed/mock data layer and the UI, and the shape the future tRPC/Drizzle
 // backend will return. Keep them backend-agnostic.
 
-export type Persona = "operator" | "board" | "resident" | "vendor";
+export type Persona = "operator" | "board" | "resident" | "vendor" | "super";
 
 export type TicketType =
   | "Maintenance"

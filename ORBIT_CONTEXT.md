@@ -57,14 +57,15 @@ src/
   data/       seed.ts (people/buildings/tickets) · flow.ts (ticket lifecycle generator)
               taxonomy.ts (15 intake categories) · playbooks.ts · vendors.ts (+COI)
               workorders.ts (WO numbering/stages/invoice) · comms.ts (chat channels/teams)
-              notices.ts · buildings.ts (systems/visits/files/tour) · identity.ts (personas/perms)
+              notices.ts · buildings.ts (systems/visits/files/tour) · supers.ts (per-building super)
+              identity.ts (personas/perms/scoped selectors)
   store/      OrbitProvider.tsx  ← global state + the backend ACTION SEAM
   components/ ui/ (Glass, Btn, Tag, Modal, AttentionChip, Icon…) · shell/ (Sidebar, TopBar)
   services/   ai.ts (client wrappers → /api/ai/*)
   features/   dashboard/ (Command Deck) · tickets/ (queue + command/ workspace + tabs)
               comms/ · ai/ · intake/ · vendors/ · notices/ · finance/ · buildings/ · search/
               portal/ (external personas) — shell + shared/ (PublicTrackerCard, NoticesPanel,
-                DirectLinePanel) + board/ + resident/ + vendor/
+                DirectLinePanel) + board/ + resident/ + vendor/ + super/
 server/       aiService.ts (Claude + heuristic) · apiPlugin.ts (Vite middleware)
 api/ai/       triage.ts · patterns.ts · vendor.ts · intake.ts (Vercel serverless)
 ```
@@ -107,6 +108,10 @@ Operator app, fully working on seed data:
 - **Finance**: AP from work-order invoices, KPIs, spend-by-building, portfolio financials.
 - **Buildings** (added by Codex): directory + 7-tab detail (Overview, Site visits,
   **3D walkthrough** w/ hotspots, Systems w/ health, People, Tickets, Files & changes).
+  Directory now has **3 view modes** — Grid (cards), List (dense table), and **Map**
+  (stylized NYC canvas with attention-colored pins). Each building has a resident
+  **superintendent** record (`supers.ts`: contact, shift, certs, responsibilities, access,
+  on-site staff).
 - **Closure checklist**: status alone can't close — requires evidence + comms + settled
   invoice + resident confirmation.
 - **Global search** (⌘K) across tickets/buildings/vendors/people.
@@ -124,6 +129,11 @@ Operator app, fully working on seed data:
   - **Vendor:** Dispatches (work awarded to them; confirm window / add photos / upload
     invoice / mark complete — all through OrbitProvider actions), Messages (line to Orbit
     field desk).
+  - **Super (teal):** Today (greeting + role/certs from `supers.ts`, urgent work, who's
+    coming on site), Work (field actions: start / note / photo / mark complete via
+    OrbitProvider → office sees it live), Walkthrough (reuses operator `VirtualWalkthrough`,
+    now exported), Systems & access (plant health + access playbook), Direct Line. Two demo
+    super accounts: Joel Petrov (Vesper House b2) and Walt Friedman (Linden Park b7).
   - **Shared, reused across personas:** `shared/PublicTrackerCard`, `shared/NoticesPanel`,
     `shared/DirectLinePanel` (ChatThread now takes an optional `seed`). Scoping helpers in
     `identity.ts` (`boardVoteTickets`, `boardActivityTickets`, `residentTickets`,
@@ -156,18 +166,17 @@ and the live Claude AI layer (already structured; just set `ANTHROPIC_API_KEY`).
 ---
 
 ## 8. What's NEXT (priority order)
-1. **External portals** — ✅ **shipped** (board, resident, vendor). Shell + persona routing
-   in `App.tsx`, scoped selectors in `identity.ts`. Remaining polish/extensions:
-   - **Super portal** (no `super` persona/account yet — would need adding to `USERS` +
-     `PERSONA_META`): their building's open work · site visits + 3D walkthrough/access map ·
-     update status / add photos from the field · vendor access.
-   - **Resident extras not yet built:** amenity booking, attachments on Submit Request,
-     real statement PDF/pay action.
+1. **External portals** — ✅ **shipped** (board, resident, vendor, **super**). Shell +
+   persona routing in `App.tsx`, scoped selectors in `identity.ts`. Remaining polish:
+   - **Resident extras:** amenity booking, attachments on Submit Request, statement PDF/pay.
    - **Vendor extras:** real file upload (photos/invoice currently log a note), COI status.
+   - **Super extras:** field actions are real but "add photo" logs a note (no real upload);
+     site visits are read-only (no "request a visit" yet).
    - **Scoping is non-negotiable:** each persona sees only their building/unit/jobs; never
      leak internal cost/vendor/notes (public tracker + scoped selectors enforce this).
-2. **Make Buildings operational:** wire actions — log/schedule a site visit, "create work
-   ticket" from a failing system, upload a file/photo, schedule service (currently read-only).
+2. **Make Buildings operational:** directory now has Grid/List/Map views (✅). Still to wire:
+   log/schedule a site visit, "create work ticket" from a failing system, upload a file/photo,
+   schedule service (detail tabs are still read-only).
 3. **Emergency Desk** (spec): pulse tiles, response-log timeline, 3-step intake wizard that
    can auto-spawn a linked work ticket.
 4. Decide & settle the **inline-vs-CSS-class** convention; add lint.

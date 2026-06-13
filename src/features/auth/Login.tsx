@@ -8,7 +8,7 @@ import { OrbitWordmark } from "@/components/shell/Wordmark";
 
 const MONO = "'JetBrains Mono', monospace";
 const SANS = "Outfit, sans-serif";
-const GROUPS: Persona[] = ["operator", "board", "resident", "vendor"];
+const GROUPS: Persona[] = ["operator", "board", "super", "resident", "vendor"];
 
 export function Login() {
   const { login } = useOrbit();

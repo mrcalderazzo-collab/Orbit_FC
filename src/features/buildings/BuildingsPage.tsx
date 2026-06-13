@@ -34,10 +34,32 @@ export function BuildingsPage({ buildingId }: { buildingId: string | null }) {
   return <BuildingDirectory onOpen={(id) => nav("buildings", id)} />;
 }
 
+type DirRow = { building: Building; activeTickets: Ticket[]; urgent: number; riskSystems: number; avgHealth: number };
+type DirView = "grid" | "list" | "map";
+
+const VIEWS: { key: DirView; label: string; icon: string }[] = [
+  { key: "grid", label: "Grid", icon: "layout-grid" },
+  { key: "list", label: "List", icon: "list" },
+  { key: "map", label: "Map", icon: "map" },
+];
+
+// Approximate placement on a stylized NYC canvas (x: west→east, y: north→south).
+const BUILDING_MAP: Record<string, { x: number; y: number }> = {
+  b1: { x: 33, y: 41 }, b2: { x: 39, y: 70 }, b3: { x: 52, y: 33 }, b4: { x: 38, y: 22 },
+  b5: { x: 55, y: 26 }, b6: { x: 56, y: 80 }, b7: { x: 82, y: 52 }, b8: { x: 63, y: 67 },
+};
+
+function rowAttention(row: DirRow): { color: string; label: string } {
+  if (row.urgent > 0 || row.riskSystems > 0 || row.building.compliance === "alert") return { color: "#ef4444", label: "Needs attention" };
+  if (row.building.compliance === "review") return { color: "#f59e0b", label: "Review due" };
+  return { color: "#22c55e", label: "Healthy" };
+}
+
 function BuildingDirectory({ onOpen }: { onOpen: (id: string) => void }) {
   const { tickets } = useOrbit();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "attention" | "healthy">("all");
+  const [view, setView] = useState<DirView>("grid");
 
   const rows = useMemo(() => BUILDINGS.map((building) => {
     const systems = BUILDING_SYSTEMS.filter((system) => system.buildingId === building.id);
@@ -84,52 +106,169 @@ function BuildingDirectory({ onOpen }: { onOpen: (id: string) => void }) {
             <button key={key} onClick={() => setFilter(key)} className={filter === key ? "building-filter active" : "building-filter"}>{label}</button>
           ))}
         </div>
+        <div className="building-view-toggle">
+          {VIEWS.map((v) => (
+            <button key={v.key} onClick={() => setView(v.key)} className={view === v.key ? "building-view-btn active" : "building-view-btn"} title={v.label + " view"}>
+              <Icon name={v.icon} size={14} color={view === v.key ? "var(--acc)" : "var(--ink-4)"} />{v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="building-directory-grid">
-        {rows.map(({ building, activeTickets, urgent, riskSystems, avgHealth }) => {
-          const manager = PEOPLE[building.am];
-          const healthColor = avgHealth >= 85 ? "#22c55e" : avgHealth >= 70 ? "#f59e0b" : "#ef4444";
+      {view === "grid" && (
+        <div className="building-directory-grid">
+          {rows.map((row) => <BuildingGridCard key={row.building.id} row={row} onOpen={onOpen} />)}
+        </div>
+      )}
+      {view === "list" && (
+        <div className="building-view-body">
+          <BuildingList rows={rows} onOpen={onOpen} />
+        </div>
+      )}
+      {view === "map" && (
+        <div className="building-view-body">
+          <BuildingMap rows={rows} onOpen={onOpen} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BuildingGridCard({ row, onOpen }: { row: DirRow; onOpen: (id: string) => void }) {
+  const { building, activeTickets, urgent, riskSystems, avgHealth } = row;
+  const manager = PEOPLE[building.am];
+  const healthColor = avgHealth >= 85 ? "#22c55e" : avgHealth >= 70 ? "#f59e0b" : "#ef4444";
+  return (
+    <button onClick={() => onOpen(building.id)} className="building-card-button" aria-label={`Open ${building.name}`}>
+      <Glass hover accent={building.mono} className="building-card">
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <span className="building-mark" style={{ color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
+            <Icon name="building-2" size={21} color={building.mono} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontFamily: SANS, fontSize: 17, fontWeight: 600, color: "var(--ink)" }}>{building.name}</h2>
+              <Tag>{building.type}</Tag>
+            </div>
+            <p style={{ margin: "4px 0 0", fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)" }}>{building.code} · {building.address}</p>
+          </div>
+          <Icon name="arrow-up-right" size={17} color="var(--ink-4)" />
+        </div>
+
+        <div className="building-card-metrics">
+          <MiniMetric label="Systems health" value={`${avgHealth}%`} color={healthColor} />
+          <MiniMetric label="Active work" value={String(activeTickets.length)} color={urgent ? "#ef4444" : "var(--ink)"} />
+          <MiniMetric label="Risk systems" value={String(riskSystems)} color={riskSystems ? "#ef4444" : "#22c55e"} />
+          <MiniMetric label="Units" value={String(building.units)} />
+        </div>
+
+        <div className="building-card-footer">
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Avatar person={manager} size={25} />
+            <span>
+              <span style={{ display: "block", fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)" }}>{manager.name}</span>
+              <span style={micro}>ACCOUNT MANAGER</span>
+            </span>
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: building.compliance === "ok" ? "#22c55e" : building.compliance === "review" ? "#f59e0b" : "#ef4444", textTransform: "uppercase" }}>
+            {building.compliance === "ok" ? "Compliance clear" : building.compliance === "review" ? "Review due" : "Compliance alert"}
+          </span>
+        </div>
+      </Glass>
+    </button>
+  );
+}
+
+function BuildingList({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) => void }) {
+  return (
+    <div className="building-list">
+      <div className="building-list-head">
+        <span>Building</span>
+        <span className="bl-col">Type</span>
+        <span className="bl-col">Units</span>
+        <span className="bl-col bl-health">Systems health</span>
+        <span className="bl-col">Active</span>
+        <span className="bl-col bl-status">Status</span>
+        <span className="bl-am">Account manager</span>
+      </div>
+      {rows.map((row) => {
+        const { building, activeTickets, urgent, avgHealth } = row;
+        const manager = PEOPLE[building.am];
+        const healthColor = avgHealth >= 85 ? "#22c55e" : avgHealth >= 70 ? "#f59e0b" : "#ef4444";
+        const attn = rowAttention(row);
+        return (
+          <button key={building.id} onClick={() => onOpen(building.id)} className="building-list-row" aria-label={`Open ${building.name}`}>
+            <span className="bl-name">
+              <span className="building-mark" style={{ width: 34, height: 34, borderRadius: 10, color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
+                <Icon name="building-2" size={17} color={building.mono} />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: SANS, fontSize: 13.5, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{building.name}</span>
+                <span style={micro}>{building.code}</span>
+              </span>
+            </span>
+            <span className="bl-col"><Tag>{building.type}</Tag></span>
+            <span className="bl-col" style={{ fontFamily: MONO, fontSize: 12, color: "var(--ink-2)" }}>{building.units}</span>
+            <span className="bl-col bl-health">
+              <span className="building-list-health"><span style={{ width: `${avgHealth}%`, background: healthColor }} /></span>
+              <strong style={{ fontFamily: MONO, fontSize: 11, color: healthColor }}>{avgHealth}%</strong>
+            </span>
+            <span className="bl-col" style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: urgent ? "#ef4444" : "var(--ink-2)" }}>{activeTickets.length}{urgent ? ` · ${urgent}!` : ""}</span>
+            <span className="bl-col bl-status">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9, fontWeight: 700, color: attn.color, textTransform: "uppercase" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: attn.color }} />{attn.label}
+              </span>
+            </span>
+            <span className="bl-am">
+              <Avatar person={manager} size={24} />
+              <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{manager.name}</span>
+            </span>
+            <Icon name="chevron-right" size={16} color="var(--ink-4)" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) => void }) {
+  const [hover, setHover] = useState<string | null>(null);
+  return (
+    <div className="building-map-wrap">
+      <div className="building-map">
+        <span className="building-map-boro" style={{ left: "30%", top: "30%" }}>MANHATTAN</span>
+        <span className="building-map-boro" style={{ left: "55%", top: "86%" }}>BROOKLYN</span>
+        <span className="building-map-boro" style={{ left: "84%", top: "40%" }}>QUEENS</span>
+        {rows.map((row) => {
+          const pos = BUILDING_MAP[row.building.id] || { x: 50, y: 50 };
+          const attn = rowAttention(row);
+          const on = hover === row.building.id;
           return (
-            <button key={building.id} onClick={() => onOpen(building.id)} className="building-card-button" aria-label={`Open ${building.name}`}>
-            <Glass hover accent={building.mono} className="building-card">
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <span className="building-mark" style={{ color: building.mono, background: `color-mix(in srgb, ${building.mono} 12%, transparent)`, borderColor: `color-mix(in srgb, ${building.mono} 35%, transparent)` }}>
-                  <Icon name="building-2" size={21} color={building.mono} />
+            <button
+              key={row.building.id}
+              className="building-map-pin"
+              style={{ left: `${pos.x}%`, top: `${pos.y}%`, zIndex: on ? 5 : 1 }}
+              onMouseEnter={() => setHover(row.building.id)}
+              onMouseLeave={() => setHover((h) => (h === row.building.id ? null : h))}
+              onClick={() => onOpen(row.building.id)}
+              aria-label={`Open ${row.building.name}`}
+            >
+              <span className="building-map-dot" style={{ background: attn.color, boxShadow: `0 0 0 4px ${attn.color}33` }} />
+              {on && (
+                <span className="building-map-tip">
+                  <strong>{row.building.name}</strong>
+                  <small>{row.building.type} · {row.building.units} units · {attn.label}</small>
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <h2 style={{ margin: 0, fontFamily: SANS, fontSize: 17, fontWeight: 600, color: "var(--ink)" }}>{building.name}</h2>
-                    <Tag>{building.type}</Tag>
-                  </div>
-                  <p style={{ margin: "4px 0 0", fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)" }}>{building.code} · {building.address}</p>
-                </div>
-                <Icon name="arrow-up-right" size={17} color="var(--ink-4)" />
-              </div>
-
-              <div className="building-card-metrics">
-                <MiniMetric label="Systems health" value={`${avgHealth}%`} color={healthColor} />
-                <MiniMetric label="Active work" value={String(activeTickets.length)} color={urgent ? "#ef4444" : "var(--ink)"} />
-                <MiniMetric label="Risk systems" value={String(riskSystems)} color={riskSystems ? "#ef4444" : "#22c55e"} />
-                <MiniMetric label="Units" value={String(building.units)} />
-              </div>
-
-              <div className="building-card-footer">
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Avatar person={manager} size={25} />
-                  <span>
-                    <span style={{ display: "block", fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)" }}>{manager.name}</span>
-                    <span style={micro}>ACCOUNT MANAGER</span>
-                  </span>
-                </span>
-                <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: building.compliance === "ok" ? "#22c55e" : building.compliance === "review" ? "#f59e0b" : "#ef4444", textTransform: "uppercase" }}>
-                  {building.compliance === "ok" ? "Compliance clear" : building.compliance === "review" ? "Review due" : "Compliance alert"}
-                </span>
-              </div>
-            </Glass>
+              )}
             </button>
           );
         })}
+      </div>
+      <div className="building-map-legend">
+        <Legend color="#22c55e" label="Healthy" />
+        <Legend color="#f59e0b" label="Review due" />
+        <Legend color="#ef4444" label="Needs attention" />
+        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}>{rows.length} of {BUILDINGS.length} shown · click a pin to open</span>
       </div>
     </div>
   );
@@ -446,7 +585,7 @@ function SiteVisitsTab({ visits, files, onTicket }: { visits: SiteVisit[]; files
   );
 }
 
-function VirtualWalkthrough({ areas, files, onTicket }: { areas: BuildingTourArea[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
+export function VirtualWalkthrough({ areas, files, onTicket }: { areas: BuildingTourArea[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
   const [areaId, setAreaId] = useState(areas[0]?.id || "");
   const [hotspotId, setHotspotId] = useState<string | null>(areas[0]?.hotspots[0]?.id || null);
   const area = areas.find((item) => item.id === areaId) || areas[0];
