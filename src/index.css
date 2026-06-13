@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Orbit FC — theme token system (Dark / Light / Clear)
+   Megabot design language: black-site command terminal. One searing lime
+   accent, two fonts. Chrome colors are variables; status colors are constant.
+   ────────────────────────────────────────────────────────────────────────── */
+:root,
+html[data-theme="dark"] {
+  --acc: #b6ff00;
+  --acc-rgb: 182, 255, 0;
+  --acc-deep: #4d6800;
+
+  --surface-0: #030303;
+  --surface-grid: rgba(255, 255, 255, 0.02);
+  --panel: rgba(15, 15, 18, 0.9);
+  --panel-solid: rgba(14, 14, 18, 0.99);
+  --sidebar-bg: rgba(8, 8, 10, 0.6);
+  --scrim: rgba(3, 3, 3, 0.78);
+  --code-bg: rgba(0, 0, 0, 0.3);
+
+  --ink: #ffffff;
+  --ink-2: #a1a1aa;
+  --ink-3: #71717a;
+  --ink-4: #52525b;
+  --ink-5: #3f3f46;
+
+  --hair: rgba(255, 255, 255, 0.05);
+  --hair-2: rgba(255, 255, 255, 0.06);
+  --hair-3: rgba(255, 255, 255, 0.08);
+  --hair-strong: rgba(255, 255, 255, 0.1);
+
+  --fill-1: rgba(255, 255, 255, 0.02);
+  --fill-2: rgba(255, 255, 255, 0.03);
+  --fill-3: rgba(255, 255, 255, 0.04);
+
+  --on-accent: #0a0a0a;
+  --acc-text: var(--acc);
+}
+
+/* LIGHT — warm paper, daylight ops */
+html[data-theme="light"] {
+  --surface-0: #efece3;
+  --surface-grid: rgba(40, 38, 30, 0.045);
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-solid: #ffffff;
+  --sidebar-bg: rgba(232, 228, 217, 0.82);
+  --scrim: rgba(48, 44, 34, 0.42);
+  --code-bg: rgba(40, 38, 30, 0.05);
+
+  --ink: #1b1d18;
+  --ink-2: #53564c;
+  --ink-3: #6c6f63;
+  --ink-4: #8b8e82;
+  --ink-5: #c0c1b6;
+
+  --hair: rgba(40, 38, 30, 0.08);
+  --hair-2: rgba(40, 38, 30, 0.1);
+  --hair-3: rgba(40, 38, 30, 0.13);
+  --hair-strong: rgba(40, 38, 30, 0.18);
+
+  --fill-1: rgba(40, 38, 30, 0.03);
+  --fill-2: rgba(40, 38, 30, 0.05);
+  --fill-3: rgba(40, 38, 30, 0.07);
+
+  --on-accent: #16180f;
+  --acc-text: #5f7d00;
+}
+
+/* CLEAR — cool frosted glass HUD */
+html[data-theme="clear"] {
+  --surface-0: #e4e8ee;
+  --surface-grid: rgba(30, 41, 59, 0.05);
+  --panel: rgba(255, 255, 255, 0.58);
+  --panel-solid: rgba(255, 255, 255, 0.96);
+  --sidebar-bg: rgba(255, 255, 255, 0.42);
+  --scrim: rgba(30, 41, 59, 0.4);
+  --code-bg: rgba(30, 41, 59, 0.06);
+
+  --ink: #14181f;
+  --ink-2: #475063;
+  --ink-3: #5d6679;
+  --ink-4: #889280;
+  --ink-5: #b3bccb;
+
+  --hair: rgba(30, 41, 59, 0.08);
+  --hair-2: rgba(30, 41, 59, 0.11);
+  --hair-3: rgba(30, 41, 59, 0.14);
+  --hair-strong: rgba(30, 41, 59, 0.2);
+
+  --fill-1: rgba(255, 255, 255, 0.32);
+  --fill-2: rgba(255, 255, 255, 0.48);
+  --fill-3: rgba(255, 255, 255, 0.62);
+
+  --on-accent: #0c1207;
+  --acc-text: #4f6b00;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: "Outfit", system-ui, sans-serif;
+    background: var(--surface-0);
+    color: var(--ink);
+    font-size: 13px;
+    overflow: hidden;
+    background-image: radial-gradient(
+      circle at 2px 2px,
+      var(--surface-grid) 1px,
+      transparent 0
+    );
+    background-size: 40px 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-4);
+  }
+}
+
+@layer components {
+  .glass {
+    background: var(--panel);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+  }
+}
+
+/* scrollbars — thin, lime on hover */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hair-3);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--acc-rgb), 0.3);
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* respect reduced motion — animation is signal, never required */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001s !important;
+  transition-duration: 0.001s !important;
+}

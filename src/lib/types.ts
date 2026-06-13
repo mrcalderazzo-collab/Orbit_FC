@@ -1,0 +1,236 @@
+// Orbit FC — domain model (spec §07). These types are the contract between
+// the seed/mock data layer and the UI, and the shape the future tRPC/Drizzle
+// backend will return. Keep them backend-agnostic.
+
+export type Persona = "operator" | "board" | "resident" | "vendor";
+
+export type TicketType =
+  | "Maintenance"
+  | "Facility"
+  | "Finance"
+  | "Documents"
+  | "Board request";
+
+export type Priority = "Critical" | "High" | "Normal" | "Low";
+
+export type TicketStatus =
+  | "Open"
+  | "Assigned"
+  | "In progress"
+  | "Awaiting review"
+  | "Closed";
+
+export type StageKey =
+  | "intake"
+  | "triage"
+  | "sourcing"
+  | "vote"
+  | "scheduled"
+  | "inprogress"
+  | "review"
+  | "closed";
+
+export type ComplianceState = "ok" | "review" | "alert";
+
+export interface Person {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  color: string;
+  email: string;
+  phone: string;
+}
+
+export interface Building {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  type: "Condo" | "Co-op" | "HOA";
+  plan: "Pro" | "Lite";
+  status: string;
+  units: number;
+  am: string; // person id of assigned account manager
+  mono: string; // per-building accent
+  reserve: number;
+  operating: number;
+  delinquency: number;
+  openTickets: number;
+  docs: number;
+  compliance: ComplianceState;
+  monthlyIncome: number;
+  monthlyExpense: number;
+}
+
+export type LogEntry = [at: string, actor: string, text: string];
+
+export interface Ticket {
+  id: string;
+  title: string;
+  building: string;
+  type: TicketType;
+  prio: Priority;
+  status: TicketStatus;
+  assignee: string | null;
+  requester: string;
+  created: string;
+  desc: string;
+  vendor?: string;
+  verified: boolean;
+  log: LogEntry[];
+  /** internal marker linking a ticket to a resident user (impersonation scope) */
+  _residentOwner?: string;
+}
+
+export interface Bid {
+  id: string;
+  vendor: string;
+  amount: number;
+  leadTimeDays: number;
+  warrantyMo: number;
+  grade: number;
+  scope: string;
+  note: string;
+  recommended?: boolean;
+}
+
+export interface Ballot {
+  name: string;
+  choice: string | null; // bid id
+  rationale: string | null;
+  at: string | null;
+}
+
+export interface Vote {
+  deadline: string;
+  quorum: number;
+  board: Ballot[];
+}
+
+export interface VendorCoordination {
+  name: string;
+  residentOk: boolean;
+  vendorOk: boolean;
+  window: string;
+}
+
+export interface RequesterUpdate {
+  stage: StageKey;
+  current: boolean;
+  text: string;
+  eta: string;
+  ts: string;
+}
+
+export interface IntakeRecord {
+  submitter: string;
+  submitterName: string;
+  channel: string;
+  unit: string | null;
+  contact: { phone: string; email: string };
+  access: string;
+  keyOnFile: boolean;
+  petOnSite: boolean;
+  media: Array<[kind: "photo" | "video" | "pdf", label: string]>;
+  reportedAt: string;
+}
+
+export interface SLA {
+  hrs: number;
+  elapsed: number;
+  breached: boolean;
+  pct: number;
+}
+
+/** The deep, deterministic lifecycle record derived from a Ticket. */
+export interface TicketFlow {
+  stage: StageKey;
+  stageIndex: number;
+  estimate: number;
+  threshold: number;
+  requiresVote: boolean;
+  intake: IntakeRecord;
+  sla: SLA;
+  bids: Bid[];
+  awardedBidId: string | null;
+  awarded: Bid | null;
+  vote: Vote | null;
+  vendor: VendorCoordination | null;
+  updates: RequesterUpdate[];
+}
+
+export interface AiRec {
+  id: string;
+  kind: string;
+  building: string;
+  confidence: number;
+  status: "pending" | "approved" | "rejected";
+  agent: string;
+  rec: string;
+  reason: string;
+  input: string;
+}
+
+export interface Emergency {
+  id: string;
+  title: string;
+  building: string;
+  type: string;
+  sev: "critical" | "high" | "watch";
+  status: "potential" | "active" | "resolved";
+  onBehalf: string;
+  channel: string;
+  nextStep: string;
+  nextDue: string | null;
+  overdue: boolean;
+  created: string;
+  linkedTicket: string | null;
+  log: Array<[at: string, text: string, actor: string]>;
+}
+
+// ── Communications (unified surface) ────────────────────────────────────
+export type CommChannel = "SMS" | "Email";
+export type CommAudience = "Resident" | "Board" | "Both";
+
+export interface TicketComment {
+  id: string;
+  by: string; // person id
+  text: string;
+  mentions: string[];
+  at: string;
+}
+
+export interface TicketMessage {
+  id: string;
+  dir: "in" | "out";
+  audience?: CommAudience;
+  channels?: CommChannel[];
+  text: string;
+  at: string;
+  by?: string; // operator person id (outbound)
+  from?: string; // sender label (inbound)
+  auto?: boolean;
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+// ── Identity ────────────────────────────────────────────────────────────
+export interface OrbitUser {
+  id: string;
+  persona: Persona;
+  who?: string; // operator → person id
+  title?: string;
+  email: string;
+  scope: string;
+  home?: string;
+  perms?: string[];
+  building?: string;
+  unit?: string;
+  company?: string;
+  person?: Pick<Person, "name" | "initials" | "color" | "role">;
+}
