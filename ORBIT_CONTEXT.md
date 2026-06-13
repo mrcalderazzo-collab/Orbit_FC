@@ -63,6 +63,7 @@ src/
   services/   ai.ts (client wrappers → /api/ai/*)
   features/   dashboard/ (Command Deck) · tickets/ (queue + command/ workspace + tabs)
               comms/ · ai/ · intake/ · vendors/ · notices/ · finance/ · buildings/ · search/
+              portal/ (external personas: shell + board Vote Center/Activity/Finances/Direct Line/Notices)
 server/       aiService.ts (Claude + heuristic) · apiPlugin.ts (Vite middleware)
 api/ai/       triage.ts · patterns.ts · vendor.ts · intake.ts (Vercel serverless)
 ```
@@ -108,8 +109,18 @@ Operator app, fully working on seed data:
 - **Closure checklist**: status alone can't close — requires evidence + comms + settled
   invoice + resident confirmation.
 - **Global search** (⌘K) across tickets/buildings/vendors/people.
-- **Personas/impersonation**: operator/board/resident/vendor; "View as" in account widget;
-  external personas currently land on a placeholder portal.
+- **Personas/impersonation**: operator/board/resident/vendor; "View as" in account widget.
+- **External portal** (`features/portal/`): one persona-tinted shell (board purple /
+  resident blue / vendor amber) with a scoped tab bar + account menu (return to Orbit
+  team / sign out), rendered full-screen for any non-operator (see `App.tsx`). **Board
+  portal is live**: **Vote Center** (directors cast ballots via the shared `castBallot`
+  store → appear live in the operator's Bids & Vote tab; live tally + quorum + roster),
+  **Activity** (their building only, rendered from the *public* tracker — no internal
+  log/cost/vendor), **Finances & compliance** (their building's books + compliance
+  register), **Direct Line** (reuses `ChatThread` to the building's AM), **Notices**
+  (scoped, read-only). Resident/vendor land on a tasteful "coming online" surface.
+  Scoping helpers live in `identity.ts` (`boardVoteTickets`, `boardActivityTickets`,
+  `scopedNotices`, `boardTickets`).
 
 ---
 
@@ -136,20 +147,20 @@ and the live Claude AI layer (already structured; just set `ANTHROPIC_API_KEY`).
 ---
 
 ## 8. What's NEXT (priority order)
-1. **External portals** (the next milestone): board / super / resident interfaces.
-   - Reuse, don't rebuild: public Uber-style tracker, ChatThread (direct-line AM),
-     Bids/Vote cards + **shared ballot store** (board votes already appear live in operator
-     Ticket Command), building snapshot (`buildings.ts`), Notices, AI-first intake.
-   - One portal shell, 3 personas, accent per spec (board purple / resident blue / vendor
-     amber). Drive off persona routing + `canSee`/scoped selectors in `identity.ts`.
-   - **Board:** Vote Center · building finances/compliance · their building activity (public
-     stage only) · direct line to AM · notices/minutes.
-   - **Super:** their building's open work · site visits + 3D walkthrough/access map · update
-     status / add photos from the field · vendor access.
-   - **Resident:** submit request (AI-first) · track my requests (public tracker) · notices ·
-     amenities · chat with my AM · statements.
+1. **External portals** (the current milestone — *board portal shipped*).
+   - ✅ **Done:** portal shell (one shell, persona accent, scoped tabs, account menu) +
+     **Board portal** (Vote Center, Activity, Finances/compliance, Direct Line, Notices).
+     Driven off persona routing in `App.tsx` + scoped selectors in `identity.ts`.
+   - Reuse, don't rebuild (still applies to the remaining personas): public Uber-style
+     tracker, ChatThread (direct-line AM), Bids/Vote cards + **shared ballot store**,
+     building snapshot (`buildings.ts`), Notices, AI-first intake.
+   - **Super (next):** their building's open work · site visits + 3D walkthrough/access map ·
+     update status / add photos from the field · vendor access.
+   - **Resident (next):** submit request (AI-first) · track my requests (public tracker) ·
+     notices · amenities · chat with my AM · statements. (Resident/vendor currently show a
+     "coming online" surface inside the shell.)
    - **Scoping is non-negotiable:** each persona sees only their building/unit; never leak
-     internal cost/vendor/notes (the public tracker already enforces this).
+     internal cost/vendor/notes (the public tracker + scoped selectors enforce this).
 2. **Make Buildings operational:** wire actions — log/schedule a site visit, "create work
    ticket" from a failing system, upload a file/photo, schedule service (currently read-only).
 3. **Emergency Desk** (spec): pulse tiles, response-log timeline, 3-step intake wizard that

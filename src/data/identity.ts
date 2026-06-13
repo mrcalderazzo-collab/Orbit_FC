@@ -2,6 +2,7 @@
 // operator (internal Orbit staff), board, resident, vendor. In production the
 // demo accounts are replaced by real auth (Argon2 + session/JWT); the persona
 // + permission model carries over unchanged.
+import type { Notice } from "@/data/notices";
 import type { OrbitUser, Persona, Ticket, TicketFlow } from "@/lib/types";
 import { PEOPLE } from "./seed";
 import { STAGE_INDEX } from "./flow";
@@ -45,4 +46,22 @@ export function boardVoteTickets(u: OrbitUser, tickets: Ticket[], flowOf: (t: Ti
     const f = flowOf(t);
     return f.requiresVote && f.bids.length && STAGE_INDEX[f.stage] >= STAGE_INDEX.vote && STAGE_INDEX[f.stage] <= STAGE_INDEX.scheduled;
   });
+}
+
+/** Building-scoped activity for the board: their building's live tickets only,
+ *  newest first, duplicates folded out. The portal renders the *public* stage of
+ *  each (the resident-facing tracker) — never internal cost/vendor/notes. */
+export function boardActivityTickets(u: OrbitUser, tickets: Ticket[]): Ticket[] {
+  return boardTickets(u, tickets)
+    .filter((t) => !t.mergedInto)
+    .sort((a, b) => (b.created || "").localeCompare(a.created || ""));
+}
+
+/** Notices visible to a board/resident: their building's broadcasts plus any
+ *  portfolio-wide ("all") notice, most recent first. Drafts stay internal. */
+export function scopedNotices(u: OrbitUser | null, notices: Notice[]): Notice[] {
+  if (!u || !u.building) return [];
+  return notices
+    .filter((n) => n.status !== "Draft" && (n.building === u.building || n.building === "all"))
+    .sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 }

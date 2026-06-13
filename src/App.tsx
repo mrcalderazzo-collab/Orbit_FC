@@ -13,11 +13,11 @@ import { FinancePage } from "@/features/finance/FinancePage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { CommandDeck } from "@/features/dashboard/CommandDeck";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
-import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
+import { ComingSoon } from "@/features/placeholder/ComingSoon";
+import { Portal } from "@/features/portal/Portal";
 
 function CurrentPage() {
-  const { route, currentUser } = useOrbit();
-  if (currentUser && currentUser.persona !== "operator") return <ExternalPortal />;
+  const { route } = useOrbit();
   switch (route.page) {
     case "tickets":
       return <TicketsPage />;
@@ -55,6 +55,7 @@ function Shell() {
     return () => { window.removeEventListener("keydown", h); window.removeEventListener("orbit-open-search", open); };
   }, []);
   if (!currentUser) return <Login />;
+  if (currentUser.persona !== "operator") return <Portal />;
   return (
     <div style={{ display: "flex", height: "100%", width: "100%" }}>
       <Sidebar />
