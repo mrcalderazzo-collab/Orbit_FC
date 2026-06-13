@@ -19,13 +19,9 @@ export const moneyFull = (n: number): string => "$" + n.toLocaleString("en-US");
 export const tint = (c: string, p: number): string =>
   `color-mix(in srgb, ${c} ${p}%, transparent)`;
 
-// "now" is pinned to the prototype's storyline moment so relative times read
-// the same against the seeded data.
-const NOW = new Date("2026-06-09T08:51:00");
-
 export const relTime = (iso: string): string => {
   const d = new Date(iso);
-  const h = Math.round((NOW.getTime() - d.getTime()) / 3.6e6);
+  const h = Math.max(0, Math.round((Date.now() - d.getTime()) / 3.6e6));
   if (h < 1) return "just now";
   if (h < 24) return h + "h ago";
   return Math.round(h / 24) + "d ago";

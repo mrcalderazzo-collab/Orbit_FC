@@ -63,6 +63,33 @@ export interface Building {
   monthlyExpense: number;
 }
 
+export type BuildingSystemState = "healthy" | "watch" | "risk" | "offline";
+
+export interface BuildingSystem {
+  id: string;
+  buildingId: string;
+  name: string;
+  kind: string;
+  location: string;
+  vendor: string;
+  state: BuildingSystemState;
+  health: number;
+  lastService: string;
+  nextService: string;
+  openTicketId?: string;
+  signal: string;
+}
+
+export interface BuildingRecord {
+  id: string;
+  buildingId: string;
+  kind: "Insurance" | "Inspection" | "Contract" | "Financial" | "Governance";
+  title: string;
+  status: "Current" | "Due soon" | "Needs review";
+  due: string;
+  owner: string;
+}
+
 export type LogEntry = [at: string, actor: string, text: string];
 
 // ── rich intake capture (from the New Intake flow) ──────────────────────

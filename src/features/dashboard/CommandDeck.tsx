@@ -34,12 +34,18 @@ export function CommandDeck() {
   const open = items.filter((i) => i.t.status !== "Closed");
   const pendingRecs = recs.filter((r) => r.status === "pending");
 
+  const claimed = new Set<string>();
+  const unique = (matches: Item[]) => matches.filter((item) => {
+    if (claimed.has(item.t.id)) return false;
+    claimed.add(item.t.id);
+    return true;
+  });
   const groups: { key: string; title: string; icon: string; color: string; items: Item[]; viewAll?: () => void }[] = [
-    { key: "critical", title: "Critical incidents", icon: "siren", color: "#ef4444", items: open.filter((i) => i.t.prio === "Critical") },
-    { key: "atrisk", title: "At risk of SLA breach", icon: "alarm-clock-off", color: "#ef4444", items: open.filter((i) => i.attn === "atRisk") },
-    { key: "reply", title: "Communications awaiting reply", icon: "reply", color: "#3b82f6", items: open.filter((i) => i.needsReply) },
-    { key: "unowned", title: "Unowned work", icon: "user-plus", color: "#f59e0b", items: open.filter((i) => i.t.status === "Open" && !i.t.assignee) },
-    { key: "approvals", title: "Approvals & board votes", icon: "vote", color: "#a855f7", items: open.filter((i) => i.attn === "waitingExternal") },
+    { key: "critical", title: "Critical incidents", icon: "siren", color: "#ef4444", items: unique(open.filter((i) => i.t.prio === "Critical")) },
+    { key: "atrisk", title: "At risk of SLA breach", icon: "alarm-clock-off", color: "#ef4444", items: unique(open.filter((i) => i.attn === "atRisk")) },
+    { key: "reply", title: "Communications awaiting reply", icon: "reply", color: "#3b82f6", items: unique(open.filter((i) => i.needsReply)) },
+    { key: "unowned", title: "Unowned work", icon: "user-plus", color: "#f59e0b", items: unique(open.filter((i) => i.t.status === "Open" && !i.t.assignee)) },
+    { key: "approvals", title: "Approvals & board votes", icon: "vote", color: "#a855f7", items: unique(open.filter((i) => i.attn === "waitingExternal")) },
   ].filter((g) => g.items.length > 0);
 
   const pulse: [string, number, string][] = [
@@ -61,7 +67,7 @@ export function CommandDeck() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const totalNeedsMe = open.filter((i) => ["atRisk", "escalated", "needsAction", "blocked"].includes(i.attn)).length;
+  const totalNeedsMe = new Set(open.filter((i) => ["atRisk", "escalated", "needsAction", "blocked"].includes(i.attn)).map((i) => i.t.id)).size;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>

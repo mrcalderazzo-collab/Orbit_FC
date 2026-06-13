@@ -12,6 +12,7 @@ import { NoticesPage } from "@/features/notices/NoticesPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { CommandDeck } from "@/features/dashboard/CommandDeck";
+import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { ComingSoon, ExternalPortal } from "@/features/placeholder/ComingSoon";
 
 function CurrentPage() {
@@ -29,7 +30,7 @@ function CurrentPage() {
     case "emergencies":
       return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
     case "buildings":
-      return <ComingSoon title="Buildings" icon="building-2" note="Directory → building detail: Overview, Building Systems with AI health prediction, Documents, Leases, People, Tickets, Audit Chain." />;
+      return <BuildingsPage buildingId={route.id} />;
     case "notices":
       return <NoticesPage />;
     case "finance":

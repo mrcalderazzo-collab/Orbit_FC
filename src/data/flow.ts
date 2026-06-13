@@ -176,6 +176,14 @@ export function ticketFlow(t: Ticket): TicketFlow {
         note: bidNote(v, t.type),
       };
     });
+    if (t.vendor && !bids.some((bid) => bid.vendor === t.vendor)) {
+      bids[bids.length - 1] = {
+        ...bids[bids.length - 1],
+        vendor: t.vendor,
+        grade: VENDOR_GRADE[t.vendor] || bids[bids.length - 1].grade,
+        note: "Vendor named on the canonical ticket record.",
+      };
+    }
     // AI "best value" = grade per $k minus lead-time penalty
     let best = bids[0];
     let bestScore = -1;
@@ -198,11 +206,11 @@ export function ticketFlow(t: Ticket): TicketFlow {
         }),
       };
       vote.board.forEach((m) => { if (m.choice && r() > 0.5) m.choice = best.id; });
-      if (decided) awardedBidId = best.id;
+      if (decided) awardedBidId = (t.vendor ? bids.find((bid) => bid.vendor === t.vendor) : null)?.id || best.id;
       else vote.board[0] = { ...vote.board[0], choice: null, rationale: null, at: null };
     }
     if (["scheduled", "inprogress", "review", "closed"].includes(stage) && !awardedBidId) {
-      awardedBidId = best.id;
+      awardedBidId = (t.vendor ? bids.find((bid) => bid.vendor === t.vendor) : null)?.id || best.id;
     }
   }
 

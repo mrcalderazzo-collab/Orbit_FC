@@ -26,7 +26,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
       out.push({ kind: "ticket", id: t.id, title: t.title, sub: t.id + " · " + (b?.name ?? ""), color: b?.mono, icon: "ticket", go: () => { onClose(); openCommand(t.id); } });
     });
     BUILDINGS.filter((b) => (b.name + " " + b.code).toLowerCase().includes(s)).slice(0, 4).forEach((b) => {
-      out.push({ kind: "building", id: b.id, title: b.name, sub: b.code + " · " + b.units + " units", color: b.mono, icon: "building-2", go: () => { onClose(); nav("buildings"); } });
+      out.push({ kind: "building", id: b.id, title: b.name, sub: b.code + " · " + b.units + " units", color: b.mono, icon: "building-2", go: () => { onClose(); nav("buildings", b.id); } });
     });
     VENDORS.filter((v) => (v.name + " " + v.code + " " + v.trades.join(" ")).toLowerCase().includes(s)).slice(0, 4).forEach((v) => {
       out.push({ kind: "vendor", id: v.id, title: v.name, sub: v.code + " · " + v.trades.slice(0, 2).join(", "), icon: "hard-hat", go: () => { onClose(); nav("vendors"); } });
