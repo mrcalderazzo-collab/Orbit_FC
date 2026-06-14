@@ -14,20 +14,30 @@ import {
 } from "react";
 import type {
   AiRec,
+  Building,
   Channel,
   ChatMessage,
   ChecklistItem,
   CommAudience,
   CommChannel,
   CommVia,
+  CrmActivity,
+  CrmOpportunity,
+  Department,
+  MarketingCampaign,
+  OrgAuditEvent,
+  OrgMember,
   OrbitUser,
   Ticket,
   TicketComment,
   TicketMessage,
+  UiDirection,
 } from "@/lib/types";
 import { stamp } from "@/lib/format";
 import { addDaysISO, todayISO } from "@/lib/focus";
-import { AI_RECS, PEOPLE, TICKETS, buildingById } from "@/data/seed";
+import { AI_RECS, BUILDINGS, PEOPLE, TICKETS, buildingById } from "@/data/seed";
+import { CRM_ACTIVITIES, CRM_OPPORTUNITIES, MARKETING_CAMPAIGNS } from "@/data/crm";
+import { DEPARTMENTS, ORG_AUDIT, ORG_MEMBERS } from "@/data/organization";
 import { ticketFlow } from "@/data/flow";
 import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoStageKey } from "@/data/workorders";
 import { WO_STAGES } from "@/data/workorders";
@@ -121,6 +131,25 @@ interface OrbitState {
   // notices (building broadcasts)
   notices: Notice[];
   sendNotice: (n: Omit<Notice, "id" | "at"> & { at?: string }) => void;
+  // owner console
+  orgMembers: OrgMember[];
+  departments: Department[];
+  orgBuildings: Building[];
+  orgAudit: OrgAuditEvent[];
+  uiDirection: UiDirection;
+  setUiDirection: (direction: UiDirection) => void;
+  addOrgMember: (member: Omit<OrgMember, "id" | "lastActive">) => void;
+  updateOrgMember: (id: string, patch: Partial<OrgMember>) => void;
+  removeOrgMember: (id: string) => void;
+  addOrgBuilding: (building: Building) => void;
+  removeOrgBuilding: (id: string) => void;
+  // sales and marketing
+  opportunities: CrmOpportunity[];
+  crmActivities: CrmActivity[];
+  campaigns: MarketingCampaign[];
+  addOpportunity: (opportunity: Omit<CrmOpportunity, "id" | "lastTouch">) => void;
+  updateOpportunity: (id: string, patch: Partial<CrmOpportunity>) => void;
+  addCrmActivity: (activity: Omit<CrmActivity, "id">) => void;
   // shared ballots
   ballots: Record<string, Record<string, string>>;
   castBallot: (ticketId: string, memberName: string, bidId: string) => void;
@@ -175,6 +204,13 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [tickets, setTickets] = useState<Ticket[]>(() => TICKETS.map((t) => ({ ...t, workDate: SEED_WORK_DATES[t.id] ?? null })));
   const [recs, setRecs] = useState<AiRec[]>(() => AI_RECS.map((r) => ({ ...r })));
   const [notices, setNotices] = useState<Notice[]>(() => SEED_NOTICES.map((n) => ({ ...n })));
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>(() => ORG_MEMBERS.map((m) => ({ ...m, access: [...m.access], buildingIds: [...m.buildingIds] })));
+  const [orgBuildings, setOrgBuildings] = useState<Building[]>(() => BUILDINGS.map((b) => ({ ...b })));
+  const [orgAudit, setOrgAudit] = useState<OrgAuditEvent[]>(() => ORG_AUDIT.map((e) => ({ ...e })));
+  const [uiDirection, setUiDirection] = useState<UiDirection>("Command");
+  const [opportunities, setOpportunities] = useState<CrmOpportunity[]>(() => CRM_OPPORTUNITIES.map((o) => ({ ...o, tags: [...o.tags] })));
+  const [crmActivities, setCrmActivities] = useState<CrmActivity[]>(() => CRM_ACTIVITIES.map((a) => ({ ...a })));
+  const [campaigns] = useState<MarketingCampaign[]>(() => MARKETING_CAMPAIGNS.map((c) => ({ ...c })));
   const [ticketComments, setTicketComments] = useState<Record<string, TicketComment[]>>({});
   const [ticketMessages, setTicketMessages] = useState<Record<string, TicketMessage[]>>({});
   const [ticketProgress, setTicketProgress] = useState<Record<string, { items: ChecklistItem[] }>>({});
@@ -338,6 +374,75 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     notify(n.status === "Scheduled" ? "Notice scheduled · " + n.reach + " residents" : n.status === "Draft" ? "Draft saved" : "Notice sent to " + n.reach + " residents");
   }, [notify]);
 
+  const appendOrgAudit = useCallback((action: string, target: string) => {
+    setOrgAudit((events) => [{
+      id: "oa" + Date.now(),
+      at: "Just now",
+      actor: currentUser ? userName(currentUser) : "System",
+      action,
+      target,
+    }, ...events]);
+  }, [currentUser]);
+
+  const addOrgMember = useCallback<OrbitState["addOrgMember"]>((member) => {
+    setOrgMembers((members) => [{ ...member, id: "m" + Date.now(), lastActive: "Invitation pending" }, ...members]);
+    appendOrgAudit("Invited organization member", member.name);
+    notify(member.name + " invited");
+  }, [appendOrgAudit, notify]);
+
+  const updateOrgMember = useCallback<OrbitState["updateOrgMember"]>((id, patch) => {
+    let target = "Team member";
+    setOrgMembers((members) => members.map((member) => {
+      if (member.id !== id) return member;
+      target = member.name;
+      return { ...member, ...patch };
+    }));
+    appendOrgAudit("Updated member access", target);
+    notify("Access updated");
+  }, [appendOrgAudit, notify]);
+
+  const removeOrgMember = useCallback((id: string) => {
+    let target = "Team member";
+    setOrgMembers((members) => members.filter((member) => {
+      if (member.id === id) target = member.name;
+      return member.id !== id;
+    }));
+    appendOrgAudit("Removed organization member", target);
+    notify(target + " removed");
+  }, [appendOrgAudit, notify]);
+
+  const addOrgBuilding = useCallback((building: Building) => {
+    setOrgBuildings((buildings) => [building, ...buildings]);
+    appendOrgAudit("Added building", building.name);
+    notify(building.name + " added");
+  }, [appendOrgAudit, notify]);
+
+  const removeOrgBuilding = useCallback((id: string) => {
+    let target = "Building";
+    setOrgBuildings((buildings) => buildings.filter((building) => {
+      if (building.id === id) target = building.name;
+      return building.id !== id;
+    }));
+    appendOrgAudit("Removed building", target);
+    notify(target + " removed");
+  }, [appendOrgAudit, notify]);
+
+  const addOpportunity = useCallback<OrbitState["addOpportunity"]>((opportunity) => {
+    setOpportunities((items) => [{ ...opportunity, id: "opp-" + Date.now(), lastTouch: "New" }, ...items]);
+    notify(opportunity.account + " added to pipeline");
+  }, [notify]);
+
+  const updateOpportunity = useCallback<OrbitState["updateOpportunity"]>((id, patch) => {
+    setOpportunities((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
+    notify("Opportunity updated");
+  }, [notify]);
+
+  const addCrmActivity = useCallback<OrbitState["addCrmActivity"]>((activity) => {
+    setCrmActivities((items) => [{ ...activity, id: "ca" + Date.now() }, ...items]);
+    setOpportunities((items) => items.map((item) => item.id === activity.opportunityId ? { ...item, lastTouch: activity.at } : item));
+    notify(activity.type + " logged");
+  }, [notify]);
+
   const castBallot = useCallback((ticketId: string, memberName: string, bidId: string) => {
     setBallots((b) => ({ ...b, [ticketId]: { ...(b[ticketId] || {}), [memberName]: bidId } }));
     pushNotification({ kind: "vote", title: "Board vote cast", detail: memberName + " voted on " + ticketId, ref: { page: "tickets", id: ticketId } });
@@ -498,6 +603,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     ticketProgress, seedProgress, setProgressItems, postProgress,
     recs, decideRec, addRecs,
     notices, sendNotice,
+    orgMembers, departments: DEPARTMENTS, orgBuildings, orgAudit, uiDirection, setUiDirection,
+    addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding,
+    opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity,
     ballots, castBallot,
     shifts, activeShift, punchIn, punchOut,
     calendar, addCalendarEvent,
@@ -506,7 +614,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

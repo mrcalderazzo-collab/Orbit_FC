@@ -16,6 +16,8 @@ import { CommandDeck } from "@/features/dashboard/CommandDeck";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { ComingSoon } from "@/features/placeholder/ComingSoon";
 import { Portal } from "@/features/portal/Portal";
+import { OwnerConsole } from "@/features/owner/OwnerConsole";
+import { SalesMarketingPage } from "@/features/sales/SalesMarketingPage";
 
 function CurrentPage() {
   const { route } = useOrbit();
@@ -32,6 +34,10 @@ function CurrentPage() {
       return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
     case "buildings":
       return <BuildingsPage buildingId={route.id} />;
+    case "owner":
+      return <OwnerConsole />;
+    case "sales":
+      return <SalesMarketingPage />;
     case "notices":
       return <NoticesPage />;
     case "finance":

@@ -443,3 +443,78 @@ export interface OrbitUser {
   company?: string;
   person?: Pick<Person, "name" | "initials" | "color" | "role">;
 }
+
+// Organization administration
+export interface Department {
+  id: string;
+  name: string;
+  lead: string;
+  color: string;
+  mandate: string;
+}
+
+export interface OrgMember {
+  id: string;
+  name: string;
+  initials: string;
+  email: string;
+  title: string;
+  departmentId: string;
+  status: "Active" | "Invited" | "Suspended";
+  access: string[];
+  buildingIds: string[];
+  lastActive: string;
+  color: string;
+}
+
+export interface OrgAuditEvent {
+  id: string;
+  at: string;
+  actor: string;
+  action: string;
+  target: string;
+}
+
+export type UiDirection = "Command" | "Editorial" | "Spatial";
+
+// Sales and marketing
+export type CrmStage = "Lead" | "Qualified" | "Discovery" | "Proposal" | "Negotiation" | "Won" | "Lost";
+
+export interface CrmOpportunity {
+  id: string;
+  account: string;
+  contact: string;
+  email: string;
+  stage: CrmStage;
+  value: number;
+  probability: number;
+  source: string;
+  owner: string;
+  nextAction: string;
+  nextAt: string;
+  lastTouch: string;
+  properties: number;
+  units: number;
+  tags: string[];
+}
+
+export interface CrmActivity {
+  id: string;
+  opportunityId: string;
+  type: "Email" | "Call" | "Meeting" | "Note";
+  text: string;
+  at: string;
+  by: string;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  channel: string;
+  status: "Draft" | "Live" | "Complete";
+  audience: number;
+  spend: number;
+  leads: number;
+  meetings: number;
+  pipeline: number;
+}

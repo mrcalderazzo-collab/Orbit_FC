@@ -16,6 +16,8 @@ export const PERSONA_META: Record<Persona, { label: string; icon: string; tint: 
 };
 
 export const USERS: OrbitUser[] = [
+  { id: "u_owner", persona: "operator", who: "owner", title: "Owner & System Administrator", email: "a.cole@orbit.ops", scope: "Organization-wide control", home: "owner", perms: ["all"] },
+  { id: "u_maya", persona: "operator", who: "maya", title: "Director of Growth", email: "m.chen@orbit.ops", scope: "Sales, marketing & portfolio growth", home: "sales", perms: ["dashboard", "sales", "comms", "buildings", "notices", "integrations"] },
   { id: "u_marcus", persona: "operator", who: "nick", title: "Principal Operator", email: "m.webb@orbit.ops", scope: "All 8 buildings · full command", home: "dashboard", perms: ["all"] },
   { id: "u_priya", persona: "operator", who: "cait", title: "Compliance & Admin", email: "p.anand@orbit.ops", scope: "Portfolio · compliance & finance", home: "tickets", perms: ["dashboard", "tickets", "comms", "buildings", "notices", "finance", "reports", "ai"] },
   { id: "u_diego", persona: "operator", who: "luke", title: "Field Intelligence", email: "d.ramos@orbit.ops", scope: "Field queue · NYC Ops", home: "tickets", perms: ["tickets", "comms", "buildings", "emergencies", "vendors"] },

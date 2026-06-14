@@ -27,6 +27,10 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
     { id: "vendors", label: "Vendors", icon: "wrench" },
     { id: "integrations", label: "Integrations", icon: "blocks" },
   ] },
+  { sec: "Growth & System", items: [
+    { id: "sales", label: "Sales & Marketing", icon: "chart-no-axes-combined" },
+    { id: "owner", label: "Owner Console", icon: "shield-check" },
+  ] },
 ];
 
 export function Sidebar() {

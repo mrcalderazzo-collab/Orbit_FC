@@ -12,6 +12,8 @@ import type {
 } from "@/lib/types";
 
 export const PEOPLE: Record<string, Person> = {
+  owner: { id: "owner", name: "Adrian Cole", role: "Owner & System Administrator", initials: "AC", color: "#f4c95d", email: "a.cole@orbit.ops", phone: "+1 (212) 555-0100" },
+  maya: { id: "maya", name: "Maya Chen", role: "Director of Growth", initials: "MC", color: "#fb7185", email: "m.chen@orbit.ops", phone: "+1 (646) 555-0124" },
   nick: { id: "nick", name: "Marcus Webb", role: "Principal Operator", initials: "MW", color: "var(--acc)", email: "m.webb@orbit.ops", phone: "+1 (212) 555-0142" },
   luke: { id: "luke", name: "Diego Ramos", role: "Field Intelligence", initials: "DR", color: "#3b82f6", email: "d.ramos@orbit.ops", phone: "+1 (917) 555-0188" },
   cait: { id: "cait", name: "Priya Anand", role: "Admin & Compliance", initials: "PA", color: "#a855f7", email: "p.anand@orbit.ops", phone: "+1 (212) 555-0167" },
