@@ -113,7 +113,13 @@ Operator app, fully working on seed data:
   PO/invoice; 8-stage tracker; invoice→approve→pay→close; handoff log.
 - **Notices**: compose building broadcasts (templates, audience, channels, urgent,
   schedule) + delivery list.
-- **Finance**: AP from work-order invoices, KPIs, spend-by-building, portfolio financials.
+- **Finance**: portfolio overview (AP from work-order invoices, KPIs, spend-by-building) +
+  **per-building drill-down** (pick a building → its own reserve trajectory, income/expense
+  charts, NOI/delinquency, AP, capital commitments). Charts via shared `components/ui/Charts`.
+- **Reports center** (`features/reports/`, derivations in `data/reports.ts`): vendor
+  performance & pricing, CSAT/TSAT, SLA, preventative maintenance, ticket bottlenecks, staff
+  performance/rates/utilization, building-health composite — each with KPIs + chart + table
+  and **CSV export**. Operator nav under Finance & Network (perm `reports`).
 - **Buildings** (added by Codex): directory + 7-tab detail (Overview, Site visits,
   **3D walkthrough** w/ hotspots, Systems w/ health, People, Tickets, Files & changes).
   Directory now has **3 view modes** — Grid (cards), List (dense table), and **Map**

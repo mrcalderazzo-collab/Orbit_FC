@@ -23,6 +23,7 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
   ] },
   { sec: "Finance & Network", items: [
     { id: "finance", label: "Finance", icon: "circle-dollar-sign" },
+    { id: "reports", label: "Reports", icon: "bar-chart-3" },
     { id: "vendors", label: "Vendors", icon: "wrench" },
     { id: "integrations", label: "Integrations", icon: "blocks" },
   ] },

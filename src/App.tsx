@@ -10,6 +10,7 @@ import { CommsPage } from "@/features/comms/CommsPage";
 import { VendorsPage } from "@/features/vendors/VendorsPage";
 import { NoticesPage } from "@/features/notices/NoticesPage";
 import { FinancePage } from "@/features/finance/FinancePage";
+import { ReportsPage } from "@/features/reports/ReportsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { CommandDeck } from "@/features/dashboard/CommandDeck";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
@@ -35,6 +36,8 @@ function CurrentPage() {
       return <NoticesPage />;
     case "finance":
       return <FinancePage />;
+    case "reports":
+      return <ReportsPage />;
     case "integrations":
       return <ComingSoon title="Integrations" icon="blocks" note="Connect Gmail, Slack, QuickBooks, DocuSign, Stripe and more — intake routing, ledger sync, e-signing." />;
     case "vendors":
