@@ -82,7 +82,16 @@ api/ai/       triage.ts · patterns.ts · vendor.ts · intake.ts (Vercel serverl
 
 ## 5. What's BUILT (feature inventory)
 Operator app, fully working on seed data:
-- **Command Deck** (sign-in landing): personalized *attention queue* — pulse strip +
+- **Role dashboards** (`features/dashboard/RoleDashboard.tsx` + `widgets.tsx`): the
+  `dashboard` route is now **role-tailored**. Operator `OrbitUser.role` (principal · director ·
+  am · field · manager · sales · marketing) selects a curated widget layout; each widget is a
+  self-contained, **clickable tile** that drills into the underlying page/ticket (nav /
+  openCommand). AM dashboards scope to the buildings they manage (`building.am`). Widget
+  registry (`WIDGETS`) makes adding a position = add a layout entry. New demo accounts per
+  position; new synth `data/leasing.ts` (occupancy/applications/waitlist/leasing+marketing
+  funnel) powers the Sales/Marketing/Occupancy widgets. (Legacy `CommandDeck.tsx` retained,
+  no longer routed.)
+- **Command Deck** (legacy attention queue, now superseded by Role dashboards): pulse strip +
   grouped cards (Critical / At-risk / Awaiting reply / Unowned / Approvals / AI recs /
   Recent changes), each row stating ONE action (Take / Reply / Approve / Escalate / Open).
 - **Attention model** (`lib/attention.ts`): every ticket has an attention state

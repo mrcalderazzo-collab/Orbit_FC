@@ -12,7 +12,7 @@ import { NoticesPage } from "@/features/notices/NoticesPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
-import { CommandDeck } from "@/features/dashboard/CommandDeck";
+import { RoleDashboard } from "@/features/dashboard/RoleDashboard";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { ComingSoon } from "@/features/placeholder/ComingSoon";
 import { Portal } from "@/features/portal/Portal";
@@ -29,7 +29,7 @@ function CurrentPage() {
     case "ai":
       return <AIReviewPage />;
     case "dashboard":
-      return <CommandDeck />;
+      return <RoleDashboard />;
     case "emergencies":
       return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
     case "buildings":

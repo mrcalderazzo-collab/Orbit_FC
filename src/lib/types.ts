@@ -430,6 +430,9 @@ export interface OrbitUser {
   id: string;
   persona: Persona;
   who?: string; // operator → person id
+  /** operator dashboard role — drives the role-tailored dashboard layout
+   *  (principal · director · am · field · manager · sales · marketing). */
+  role?: string;
   title?: string;
   email: string;
   scope: string;

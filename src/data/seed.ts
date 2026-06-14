@@ -22,6 +22,9 @@ export const PEOPLE: Record<string, Person> = {
   jess: { id: "jess", name: "Nina Costa", role: "Asset Manager", initials: "NC", color: "#f59e0b", email: "n.costa@orbit.ops", phone: "+1 (718) 555-0173" },
   caro: { id: "caro", name: "Grace Lin", role: "Asset Manager", initials: "GL", color: "#ec4899", email: "g.lin@orbit.ops", phone: "+1 (347) 555-0151" },
   coord: { id: "coord", name: "Owen Frey", role: "Account Coordinator", initials: "OF", color: "#14b8a6", email: "o.frey@orbit.ops", phone: "+1 (212) 555-0190" },
+  dana: { id: "dana", name: "Dana Brooks", role: "Operations Manager", initials: "DB", color: "#8b5cf6", email: "d.brooks@orbit.ops", phone: "+1 (212) 555-0210" },
+  rita: { id: "rita", name: "Rita Okafor", role: "Leasing & Sales Lead", initials: "RO", color: "#06b6d4", email: "r.okafor@orbit.ops", phone: "+1 (646) 555-0228" },
+  milo: { id: "milo", name: "Milo Hart", role: "Marketing Lead", initials: "MH", color: "#f472b6", email: "m.hart@orbit.ops", phone: "+1 (917) 555-0244" },
 };
 
 export const BUILDINGS: Building[] = [
