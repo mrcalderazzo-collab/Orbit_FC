@@ -10,6 +10,7 @@ import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { TicketBoard, TicketCards, TicketList, TicketQueue } from "./views";
 import { FocusBoard } from "./FocusBoard";
+import { FrontDesk } from "./FrontDesk";
 import { seedMessageList } from "./command/commsSeed";
 import { NewIntakeWizard } from "@/features/intake/NewIntakeWizard";
 
@@ -23,7 +24,7 @@ const APPROVAL_OPTS = [
   { value: "review", label: "Awaiting review" },
   { value: "pm", label: "PM authority" },
 ];
-const VIEWS: [string, string][] = [["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
+const VIEWS: [string, string][] = [["frontdesk", "concierge-bell"], ["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
 
 const PRESETS: [string, string][] = [["all", "All"], ["mine", "My buildings"], ["unowned", "Unowned"], ["sla", "SLA risk"], ["reply", "Awaiting reply"]];
 
@@ -36,7 +37,7 @@ export function TicketsPage() {
   const [fBuilding, setFBuilding] = useState("All");
   const [fVendor, setFVendor] = useState("All");
   const [fApproval, setFApproval] = useState("All");
-  const [view, setView] = useState("queue");
+  const [view, setView] = useState("frontdesk");
   const [creating, setCreating] = useState(false);
 
   const flowMap = useMemo(() => {
@@ -62,7 +63,7 @@ export function TicketsPage() {
     if (t.mergedInto) return false; // duplicates folded into their canonical ticket
     if (preset === "mine" && !(myWho && BUILDINGS.find((b) => b.id === t.building)?.am === myWho)) return false;
     if (preset === "unowned" && !(t.status === "Open" && !t.assignee)) return false;
-    if (preset === "sla" && !(f && f.sla.breached && t.status !== "Closed")) return false;
+    if (preset === "sla" && !(f && f.sla.breached && t.status !== "Closed" && !t.held)) return false;
     if (preset === "reply" && !(t.status !== "Closed" && needsReply(t))) return false;
     if (fStatus !== "All" && t.status !== fStatus) return false;
     if (fType !== "All" && t.type !== fType) return false;
@@ -120,6 +121,7 @@ export function TicketsPage() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>
+        {view === "frontdesk" && <FrontDesk tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
         {view === "focus" && <FocusBoard tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
         {view === "queue" && <TicketQueue tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
         {view === "list" && <TicketList tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, ticketApproval, ticketVendorName } from "@/lib/ticket";
+import { effectiveTeam, teamByKey } from "@/data/routing";
 import { BUILDINGS, PEOPLE, TICKET_STATUS } from "@/data/seed";
 import { Avatar, Empty, Glass, Icon, PrioDot, StatusTag, Tag } from "@/components/ui";
 import { ApprovalChip } from "./ApprovalChip";
@@ -56,6 +57,11 @@ export function TicketQueue({ tickets, onOpen, flowMap = {} }: ViewProps) {
                           <Icon name={s.level === "breach" ? "alarm-clock-off" : "alarm-clock"} size={9} color={s.color} />{s.level === "breach" ? "SLA" : s.label}
                         </span>); })()}
                       {(appr === "awaiting" || appr === "approved") && <span style={{ flexShrink: 0 }}><ApprovalChip state={appr} small /></span>}
+                      {(() => {
+                        if (t.held) return <span style={{ flexShrink: 0, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#f59e0b", background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.28)", padding: "2px 6px", borderRadius: 5 }}>On hold</span>;
+                        const tm = teamByKey(effectiveTeam(t));
+                        return tm ? <span title={"Routed to " + tm.label} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: tm.color === "var(--ink-3)" ? "var(--ink-3)" : tm.color }}><Icon name={tm.icon} size={10} color={tm.color} />{tm.label}</span> : null;
+                      })()}
                       <Tag>{t.type}</Tag>
                       <span style={{ width: 110, flexShrink: 0 }}><StatusTag status={t.status} /></span>
                       <span style={{ width: 28, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>{t.assignee ? <Avatar person={t.assignee} size={22} /> : <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--ink-5)" }} />}</span>

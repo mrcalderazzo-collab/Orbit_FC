@@ -98,8 +98,20 @@ Operator app, fully working on seed data:
   (At-risk / Escalated / Blocked / Needs action / Waiting externally / On track / Resolved)
   separate from lifecycle status.
 - **Work Tickets**: search + filters, **saved views** (My buildings / Unowned / SLA risk /
-  Awaiting reply), 5 views — **Focus** (do-date work board: Today / Response required /
-  New incoming / Scheduled / To organize, ClickUp-style do-dates), Queue, List, Cards, Kanban.
+  Awaiting reply), 6 views — **Front Desk** (default), **Focus** (do-date board: Today /
+  Response required / New incoming / Scheduled / To organize), Queue, List, Cards, Kanban.
+- **Front Desk · central intake routing** (`features/tickets/FrontDesk.tsx`, rules in
+  `data/routing.ts`): every new ticket is **auto-routed on arrival** (`autoRoute` rules:
+  finance→Finance, compliance/docs→Compliance, board→Legal, moves→Leasing, routine field→
+  **Super first**, urgent field→central **Facilities PM**, unclassifiable→Front Desk). The
+  desk is an **exceptions/confirm queue**, not a chokepoint — lanes: Needs routing (accept
+  the suggestion / reroute to any team / send to super / **hold for info**), Super-first
+  ready-to-escalate (aged super tickets → escalate to Facilities PM), On hold (SLA paused).
+  `Ticket.team` + `Ticket.held`; actions `routeTicket` / `holdForInfo` / `releaseHold` on
+  OrbitProvider. Team chips now show on Queue rows so routing is visible across the flow.
+  TEAMS: Front Desk · Facilities PM · Building Super · Compliance · Finance · Legal/Board ·
+  Leasing (each with a lead). Design intent: traditional building ownership (super first
+  line) + new-school centralized dispatch + AI auto-routing at 100-building scale.
 - **Ticket Command workspace** (full-screen): header (status mover, **do-date**, SLA,
   **Escalate**, **Close out**, **Message** dock), Uber-style stage tracker w/ conditional
   Board Vote, tabs: **Overview** (Resume·handoff briefing, AI triage panel, subtasks w/

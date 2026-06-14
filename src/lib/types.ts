@@ -234,6 +234,12 @@ export interface Ticket {
   mergedInto?: string | null;
   /** taxonomy category key (richer than `type`); top-level for quick filter */
   category?: string;
+  /** Front Desk routing — which team/queue the ticket has been sent to
+   *  (frontdesk · facilities · super · compliance · finance · legal · leasing). */
+  team?: string | null;
+  /** Needs-info hold: parked pending photos/access/scope. While held it stays
+   *  out of the team queues and doesn't burn the SLA clock. */
+  held?: { reason: string; at: string } | null;
   /** operational tags (Recurring, Warranty, After-hours, …) */
   tags?: string[];
   /** full captured intake from the New Intake flow */

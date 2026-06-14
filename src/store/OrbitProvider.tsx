@@ -43,6 +43,7 @@ import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoS
 import { WO_STAGES } from "@/data/workorders";
 import { SEED_NOTICES, type Notice } from "@/data/notices";
 import { userById, userName } from "@/data/identity";
+import { autoRoute, teamByKey } from "@/data/routing";
 
 // a few do-dates so the Focus board has content on first load
 const SEED_WORK_DATES: Record<string, string> = {
@@ -108,6 +109,10 @@ interface OrbitState {
   spawnChildTicket: (parentId: string, data: { title: string; type?: Ticket["type"]; prio?: Ticket["prio"] }) => string;
   linkTickets: (aId: string, bId: string) => void;
   mergeTickets: (sourceId: string, targetId: string) => void;
+  // front desk routing
+  routeTicket: (id: string, team: string, note?: string) => void;
+  holdForInfo: (id: string, reason: string) => void;
+  releaseHold: (id: string) => void;
   // the open full-screen Ticket Command workspace (so any view can open one)
   commandId: string | null;
   openCommand: (id: string) => void;
@@ -285,11 +290,34 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       log: [logLine(me(), "Ticket created")],
       ...data,
     } as Ticket;
-    setTickets((ts) => [t, ...ts]);
+    const routed: Ticket = { ...t, team: data.team ?? autoRoute(t).team };
+    setTickets((ts) => [routed, ...ts]);
     notify(id + " created");
     pushNotification({ kind: "ticket", title: "New ticket · " + (data.title || id), detail: (buildingById(data.building)?.name ?? data.building) + " · from " + (data.requester || "intake"), building: data.building, ref: { page: "tickets", id } });
     return id;
   }, [me, notify, pushNotification]);
+
+  const routeTicket = useCallback<OrbitState["routeTicket"]>((id, team, note) => {
+    const def = teamByKey(team);
+    setTickets((ts) => ts.map((t) => {
+      if (t.id !== id) return t;
+      const lead = def?.lead ?? null;
+      return { ...t, team, held: null, assignee: lead ?? t.assignee, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine(me(), "Routed → " + (def?.label || team) + (note ? " · " + note : ""))] };
+    }));
+    notify("Routed to " + (def?.label || team));
+    const tk = TICKETS.find((x) => x.id === id);
+    pushNotification({ kind: "ticket", title: id + " → " + (def?.label || team), detail: tk?.title, building: tk?.building, ref: { page: "tickets", id } });
+  }, [me, notify, pushNotification]);
+
+  const holdForInfo = useCallback<OrbitState["holdForInfo"]>((id, reason) => {
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, held: { reason, at: stamp() }, log: [...t.log, logLine(me(), "On hold for info · " + reason)] } : t));
+    notify("Parked · awaiting info");
+  }, [me, notify]);
+
+  const releaseHold = useCallback<OrbitState["releaseHold"]>((id) => {
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, held: null, log: [...t.log, logLine(me(), "Info received · hold released")] } : t));
+    notify("Hold released");
+  }, [me, notify]);
 
   const assignTicket = useCallback((id: string, who: string) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, assignee: who, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine("nick", "Assigned to " + (PEOPLE[who]?.name || who))] } : t));
@@ -597,6 +625,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     theme, setTheme,
     tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket,
     spawnChildTicket, linkTickets, mergeTickets,
+    routeTicket, holdForInfo, releaseHold,
     commandId, openCommand, closeCommand,
     ticketComments, seedComments, addComment,
     ticketMessages, seedMessages, sendTicketMessage,
@@ -614,7 +643,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }
