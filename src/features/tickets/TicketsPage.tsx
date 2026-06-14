@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ticketApproval, ticketVendorName, type ApprovalState } from "@/lib/ticket";
-import { effectiveTeam, teamByKey } from "@/data/routing";
+import { effectiveTeam, teamByKey, atFrontDesk } from "@/data/routing";
 import { ticketFlow } from "@/data/flow";
 import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
 import { Btn, Icon, inputStyle, Select } from "@/components/ui";
@@ -85,6 +85,8 @@ export function TicketsPage() {
     return teamByKey(effectiveTeam(t))?.lead === myWho;
   });
 
+  const viewCount: Record<string, number> = { frontdesk: filtered.filter(atFrontDesk).length, myqueue: mine.length };
+
   const active = tickets.filter((t) => t.status !== "Closed").length;
   const critical = tickets.filter((t) => t.prio === "Critical" && t.status !== "Closed").length;
   const anyFilter = fStatus !== "All" || fType !== "All" || fBuilding !== "All" || fVendor !== "All" || fApproval !== "All" || q;
@@ -112,8 +114,9 @@ export function TicketsPage() {
         )}
         <div style={{ marginLeft: "auto", display: "flex", gap: 2, padding: 3, borderRadius: 10, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
           {VIEWS.map(([v, ic]) => (
-            <button key={v} onClick={() => setView(v)} style={{ display: "flex", padding: "6px 9px", borderRadius: 7, border: "none", cursor: "pointer", background: view === v ? "rgba(var(--acc-rgb),0.12)" : "transparent" }}>
+            <button key={v} onClick={() => setView(v)} title={v} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 9px", borderRadius: 7, border: "none", cursor: "pointer", background: view === v ? "rgba(var(--acc-rgb),0.12)" : "transparent" }}>
               <Icon name={ic} size={15} color={view === v ? "var(--acc)" : "var(--ink-3)"} />
+              {viewCount[v] ? <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, minWidth: 15, height: 15, padding: "0 4px", borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center", background: view === v ? "var(--acc)" : "var(--hair)", color: view === v ? "var(--on-accent)" : "var(--ink-3)" }}>{viewCount[v]}</span> : null}
             </button>
           ))}
         </div>

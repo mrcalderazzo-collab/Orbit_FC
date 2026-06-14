@@ -30,19 +30,19 @@ export function DoDateMenu({ id, date, compact }: { id: string; date?: string | 
     ["Tomorrow", addDaysISO(1)],
     ["In 3 days", addDaysISO(3)],
     ["Next week", addDaysISO(7)],
-    ["Clear do-date", null],
+    ["Clear next touch", null],
   ];
 
   return (
     <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
-      {!compact && <div style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>DO DATE</div>}
+      {!compact && <div style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>NEXT TOUCH</div>}
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        title="Set your do-date (when you plan to work this)"
+        title="Set the next touch (when you plan to work this)"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: compact ? "4px 9px" : "6px 11px", borderRadius: 99, cursor: "pointer", background: date ? `color-mix(in srgb, ${c} 12%, transparent)` : "var(--fill-2)", border: "1px solid " + (date ? `color-mix(in srgb, ${c} 32%, transparent)` : "var(--hair-3)"), color: date ? c : "var(--ink-3)", fontFamily: MONO, fontSize: compact ? 9 : 10, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap" }}
       >
         <Icon name="calendar-clock" size={compact ? 11 : 13} color={date ? c : "var(--ink-4)"} />
-        {label || "SET DO-DATE"}
+        {label || "SET NEXT TOUCH"}
         <Icon name="chevron-down" size={compact ? 10 : 12} color={date ? c : "var(--ink-4)"} />
       </button>
       {open && (

@@ -80,7 +80,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
             </div>
           </div>
           <TicketStatusMenu t={t} />
-          <div><div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>DO DATE</div><DoDateMenu id={t.id} date={t.workDate} compact /></div>
+          <div><div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>NEXT TOUCH</div><DoDateMenu id={t.id} date={t.workDate} compact /></div>
           <SlaChip f={f} />
           {slaState(f).level !== "ok" && t.prio !== "Critical" && (
             <button onClick={() => escalateTicket(t.id)} title="Escalate — SLA at risk" style={{ display: "flex", alignItems: "center", gap: 6, height: 34, marginTop: 13, padding: "0 13px", borderRadius: 99, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer", flexShrink: 0, fontFamily: "Outfit, sans-serif", fontSize: 12, fontWeight: 600 }}>

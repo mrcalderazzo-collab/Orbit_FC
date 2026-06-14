@@ -53,7 +53,7 @@ export function FocusBoard({ tickets, flowMap, onOpen }: { tickets: Ticket[]; fl
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 2px 8px", flexWrap: "wrap" }}>
         <Icon name="target" size={15} color="var(--acc-text)" />
         <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Your work board</span>
-        <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.05em" }}>· buckets by what needs you next · set a do-date to plan your day</span>
+        <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.05em" }}>· buckets by what needs you next · set a next touch to plan your day</span>
       </div>
       {breaching.length > 0 && (
         <div>

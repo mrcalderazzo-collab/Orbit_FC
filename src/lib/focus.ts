@@ -25,11 +25,11 @@ export function doDateLabel(date?: string | null): string | null {
 export type FocusBucket = "today" | "reply" | "inbound" | "scheduled" | "backlog";
 
 export const FOCUS_BUCKETS: { key: FocusBucket; label: string; desc: string; c: string; icon: string }[] = [
-  { key: "today", label: "Today", desc: "Your do-date is today — work these now", c: "var(--acc)", icon: "target" },
+  { key: "today", label: "Today", desc: "Next touch is today — work these now", c: "var(--acc)", icon: "target" },
   { key: "reply", label: "Response required", desc: "A resident or board message is waiting on you", c: "#3b82f6", icon: "reply" },
   { key: "inbound", label: "New incoming", desc: "Just arrived · needs triage", c: "var(--ink-4)", icon: "inbox" },
-  { key: "scheduled", label: "Scheduled", desc: "Do-date set for a later day", c: "#a855f7", icon: "calendar-clock" },
-  { key: "backlog", label: "To organize", desc: "Active & yours · no do-date yet", c: "var(--ink-3)", icon: "layers" },
+  { key: "scheduled", label: "Scheduled", desc: "Next touch set for a later day", c: "#a855f7", icon: "calendar-clock" },
+  { key: "backlog", label: "To organize", desc: "Active & yours · no next touch yet", c: "var(--ink-3)", icon: "layers" },
 ];
 
 /** assign a ticket to exactly one bucket (priority order). Returns null for
