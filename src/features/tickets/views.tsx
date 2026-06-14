@@ -1,7 +1,7 @@
 // Ticket queue views: grouped Queue, List, Cards, Kanban Board. Mirrors Tickets.jsx.
 import { useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
-import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, ticketApproval, ticketVendorName } from "@/lib/ticket";
+import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, statusLabel, ticketApproval, ticketVendorName } from "@/lib/ticket";
 import { effectiveTeam, teamByKey } from "@/data/routing";
 import { BUILDINGS, PEOPLE, TICKET_STATUS } from "@/data/seed";
 import { Avatar, Empty, Glass, Icon, PrioDot, StatusTag, Tag } from "@/components/ui";
@@ -160,7 +160,7 @@ export function TicketBoard({ tickets, onOpen }: ViewProps) {
           <div key={col} style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 4px 10px" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />
-              <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", color: "var(--ink-2)", textTransform: "uppercase" }}>{col}</span>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", color: "var(--ink-2)", textTransform: "uppercase" }}>{statusLabel(col)}</span>
               <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginLeft: "auto" }}>{items.length}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

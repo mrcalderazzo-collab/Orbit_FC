@@ -17,6 +17,7 @@ const ROLE_META: Record<string, { label: string; sub: string }> = {
   manager: { label: "Operations", sub: "Queue, SLA, team & vendors" },
   sales: { label: "Leasing & sales", sub: "Occupancy & pipeline" },
   marketing: { label: "Marketing", sub: "Funnel & sources" },
+  dispatch: { label: "Dispatch", sub: "Front desk — route & clear intake" },
 };
 
 const LAYOUTS: Record<string, string[]> = {
@@ -27,6 +28,7 @@ const LAYOUTS: Record<string, string[]> = {
   manager: ["tickets", "sla", "bottlenecks", "staff", "comms", "vendors", "health"],
   sales: ["occupancy", "leasing", "applications", "turnaround", "comms"],
   marketing: ["marketing", "applications", "occupancy", "leasing"],
+  dispatch: ["attention", "tickets", "comms", "sla", "vendors", "bottlenecks"],
 };
 
 export function RoleDashboard() {

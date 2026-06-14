@@ -112,6 +112,15 @@ Operator app, fully working on seed data:
   TEAMS: Front Desk · Facilities PM · Building Super · Compliance · Finance · Legal/Board ·
   Leasing (each with a lead). Design intent: traditional building ownership (super first
   line) + new-school centralized dispatch + AI auto-routing at 100-building scale.
+- **Operating model & language:** the Front Desk is staffed by a **Dispatcher role**
+  (`role: "dispatch"`, demo: Owen Frey) but is a **pooled queue anyone can Claim from**.
+  **Role-based landing** in Work Tickets: dispatch/principal/director/manager (and `all`
+  perm) default to **Front Desk**; everyone else lands on **My Queue** (`myqueue` view =
+  tickets I own / a team I lead / my buildings). **Our pipeline vocabulary** (display layer
+  via `STATUS_LABEL` in `lib/ticket.ts`, internal status values unchanged): Open→**Front
+  Desk**, Assigned→**Dispatched**, In progress→**In Progress**, Awaiting review→**Final
+  Check**, Closed→**Closed**; queue groups: Front Desk · In Flight · Final Check · Closed.
+  Applied in StatusTag, the status mover, Kanban headers, and queue groups.
 - **Ticket Command workspace** (full-screen): header (status mover, **do-date**, SLA,
   **Escalate**, **Close out**, **Message** dock), Uber-style stage tracker w/ conditional
   Board Vote, tabs: **Overview** (Resume·handoff briefing, AI triage panel, subtasks w/

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ticketApproval, ticketVendorName, type ApprovalState } from "@/lib/ticket";
+import { effectiveTeam, teamByKey } from "@/data/routing";
 import { ticketFlow } from "@/data/flow";
 import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
 import { Btn, Icon, inputStyle, Select } from "@/components/ui";
@@ -24,7 +25,9 @@ const APPROVAL_OPTS = [
   { value: "review", label: "Awaiting review" },
   { value: "pm", label: "PM authority" },
 ];
-const VIEWS: [string, string][] = [["frontdesk", "concierge-bell"], ["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
+const VIEWS: [string, string][] = [["frontdesk", "concierge-bell"], ["myqueue", "user-round"], ["focus", "target"], ["queue", "list-tree"], ["list", "list"], ["cards", "layout-grid"], ["board", "columns-3"]];
+// who lands on the Front Desk vs their own queue
+const DESK_ROLES = ["dispatch", "principal", "director", "manager"];
 
 const PRESETS: [string, string][] = [["all", "All"], ["mine", "My buildings"], ["unowned", "Unowned"], ["sla", "SLA risk"], ["reply", "Awaiting reply"]];
 
@@ -37,7 +40,7 @@ export function TicketsPage() {
   const [fBuilding, setFBuilding] = useState("All");
   const [fVendor, setFVendor] = useState("All");
   const [fApproval, setFApproval] = useState("All");
-  const [view, setView] = useState("frontdesk");
+  const [view, setView] = useState(() => (currentUser?.role && DESK_ROLES.includes(currentUser.role)) || currentUser?.perms?.includes("all") ? "frontdesk" : "myqueue");
   const [creating, setCreating] = useState(false);
 
   const flowMap = useMemo(() => {
@@ -72,6 +75,14 @@ export function TicketsPage() {
     if (fApproval !== "All" && ticketApproval(t, f) !== (fApproval as ApprovalState)) return false;
     if (q && !(t.title + t.id).toLowerCase().includes(q.toLowerCase())) return false;
     return true;
+  });
+
+  // "My Queue" — work routed to me: I own it, it's in a team I lead, or it's my building
+  const mine = filtered.filter((t) => {
+    if (t.status === "Closed" || !myWho) return false;
+    if (t.assignee === myWho) return true;
+    if (BUILDINGS.find((b) => b.id === t.building)?.am === myWho) return true;
+    return teamByKey(effectiveTeam(t))?.lead === myWho;
   });
 
   const active = tickets.filter((t) => t.status !== "Closed").length;
@@ -122,6 +133,7 @@ export function TicketsPage() {
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>
         {view === "frontdesk" && <FrontDesk tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
+        {view === "myqueue" && <TicketQueue tickets={mine} onOpen={openCommand} flowMap={flowMap} />}
         {view === "focus" && <FocusBoard tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
         {view === "queue" && <TicketQueue tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}
         {view === "list" && <TicketList tickets={filtered} onOpen={openCommand} flowMap={flowMap} />}

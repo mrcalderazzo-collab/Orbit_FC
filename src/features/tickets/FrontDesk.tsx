@@ -98,7 +98,8 @@ function RowShell({ t, onOpen, children }: { t: Ticket; onOpen: (id: string) => 
 }
 
 function RouteRow({ t, onOpen }: { t: Ticket; onOpen: (id: string) => void }) {
-  const { routeTicket, holdForInfo } = useOrbit();
+  const { routeTicket, holdForInfo, assignTicket, currentUser } = useOrbit();
+  const myWho = currentUser?.persona === "operator" ? currentUser.who : undefined;
   const [reroute, setReroute] = useState(false);
   const [holdOpen, setHoldOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -129,6 +130,7 @@ function RouteRow({ t, onOpen }: { t: Ticket; onOpen: (id: string) => void }) {
         )}
         <Btn small ghost icon="git-fork" onClick={() => setReroute((r) => !r)}>Reroute</Btn>
         <Btn small ghost icon="circle-pause" onClick={() => setHoldOpen((h) => !h)}>Hold for info</Btn>
+        {myWho && <Btn small ghost icon="hand" onClick={() => assignTicket(t.id, myWho)} style={{ marginLeft: "auto" }}>Claim it</Btn>}
       </div>
 
       {reroute && (

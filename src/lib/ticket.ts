@@ -10,6 +10,17 @@ export const STATUS_COLOR: Record<TicketStatus, string> = {
   Closed: "#22c55e",
 };
 
+// Display layer — our language over the internal status values. The stored
+// status stays stable (Open/Assigned/…); the UI speaks the Orbit pipeline.
+export const STATUS_LABEL: Record<TicketStatus, string> = {
+  Open: "Front Desk",
+  Assigned: "Dispatched",
+  "In progress": "In Progress",
+  "Awaiting review": "Final Check",
+  Closed: "Closed",
+};
+export const statusLabel = (s: TicketStatus): string => STATUS_LABEL[s] ?? s;
+
 export const PRIO_COLOR: Record<Priority, string> = {
   Critical: "#ef4444",
   High: "#f59e0b",
@@ -52,10 +63,10 @@ export const TICKET_GROUPS: {
   c: string;
   match: (t: Ticket) => boolean;
 }[] = [
-  { key: "inbound", label: "Inbound", desc: "New · needs triage", c: "var(--ink-4)", match: (t) => t.status === "Open" },
-  { key: "inflight", label: "In Flight", desc: "Assigned · in progress", c: "var(--acc)", match: (t) => t.status === "Assigned" || t.status === "In progress" },
-  { key: "review", label: "Awaiting Review", desc: "Verify & close", c: "#f59e0b", match: (t) => t.status === "Awaiting review" },
-  { key: "resolved", label: "Resolved", desc: "Closed · chain-verified", c: "#22c55e", match: (t) => t.status === "Closed" },
+  { key: "inbound", label: "Front Desk", desc: "Just arrived · being routed", c: "var(--ink-4)", match: (t) => t.status === "Open" },
+  { key: "inflight", label: "In Flight", desc: "Dispatched · in progress", c: "var(--acc)", match: (t) => t.status === "Assigned" || t.status === "In progress" },
+  { key: "review", label: "Final Check", desc: "Verify & close", c: "#f59e0b", match: (t) => t.status === "Awaiting review" },
+  { key: "resolved", label: "Closed", desc: "Resolved · chain-verified", c: "#22c55e", match: (t) => t.status === "Closed" },
 ];
 
 export const stageReached = (f: TicketFlow, key: keyof typeof STAGE_INDEX): boolean =>

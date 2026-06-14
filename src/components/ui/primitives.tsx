@@ -3,7 +3,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Person, Priority, TicketStatus } from "@/lib/types";
 import { tint } from "@/lib/format";
-import { PRIO_COLOR, STATUS_COLOR } from "@/lib/ticket";
+import { PRIO_COLOR, STATUS_COLOR, statusLabel } from "@/lib/ticket";
 import { PEOPLE } from "@/data/seed";
 import { Icon } from "./Icon";
 
@@ -51,7 +51,7 @@ export function StatusTag({ status }: { status: TicketStatus }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontWeight: 700, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.12em", color: c, background: tint(c, 12), border: "1px solid " + tint(c, 28), padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: c, boxShadow: status === "In progress" ? "0 0 8px " + c : "none" }} />
-      {status}
+      {statusLabel(status)}
     </span>
   );
 }

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
-import { STATUS_COLOR } from "@/lib/ticket";
+import { STATUS_COLOR, statusLabel } from "@/lib/ticket";
 import { tint } from "@/lib/format";
 import { TICKET_STATUS } from "@/data/seed";
 import { FLOW_STAGES } from "@/data/flow";
@@ -27,7 +27,7 @@ export function TicketStatusMenu({ t }: { t: Ticket }) {
       <div style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)", marginBottom: 5 }}>STATUS</div>
       <button onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px 6px 11px", borderRadius: 99, cursor: "pointer", background: tint(c, 12), border: "1px solid " + tint(c, 34), fontFamily: MONO, fontWeight: 700, fontSize: 10, letterSpacing: "0.1em", color: c, textTransform: "uppercase", whiteSpace: "nowrap" }}>
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: c, boxShadow: t.status === "In progress" ? "0 0 8px " + c : "none" }} />
-        {t.status}
+        {statusLabel(t.status)}
         <Icon name="chevrons-up-down" size={13} color={c} />
       </button>
       {open && (
@@ -41,7 +41,7 @@ export function TicketStatusMenu({ t }: { t: Ticket }) {
                 onMouseEnter={(e) => { if (!cur) e.currentTarget.style.background = "var(--fill-2)"; }}
                 onMouseLeave={(e) => { if (!cur) e.currentTarget.style.background = "transparent"; }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: sc, flexShrink: 0 }} />
-                <span style={{ fontFamily: SANS, fontSize: 12.5, color: cur ? "var(--ink)" : "var(--ink-2)", fontWeight: cur ? 600 : 400, flex: 1 }}>{s}</span>
+                <span style={{ fontFamily: SANS, fontSize: 12.5, color: cur ? "var(--ink)" : "var(--ink-2)", fontWeight: cur ? 600 : 400, flex: 1 }}>{statusLabel(s)}</span>
                 {i < idx && <Icon name="check" size={12} color="#22c55e" />}
                 {cur && <span style={{ fontFamily: MONO, fontSize: 8, color: sc, letterSpacing: "0.1em" }}>● NOW</span>}
               </button>
