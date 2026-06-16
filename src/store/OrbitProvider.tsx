@@ -660,6 +660,38 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(iv);
   }, [pushNotification]);
 
+  // ── persistence ── hydrate once on mount, then save on change so a refresh
+  // no longer wipes the session. Versioned key + try/catch; the seed remains the
+  // default when nothing is saved. (This is the localStorage stand-in for the
+  // real backend that will sit behind the same action surface.)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("orbit_state_v1");
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.tickets) setTickets(s.tickets);
+      if (s.ballots) setBallots(s.ballots);
+      if (s.ticketComments) setTicketComments(s.ticketComments);
+      if (s.ticketMessages) setTicketMessages(s.ticketMessages);
+      if (s.ticketProgress) setTicketProgress(s.ticketProgress);
+      if (s.chat) setChat(s.chat);
+      if (s.notices) setNotices(s.notices);
+      if (s.recs) setRecs(s.recs);
+      if (s.workOrders) setWorkOrders(s.workOrders);
+      if (s.shifts) setShifts(s.shifts);
+      if (s.calendar) setCalendar(s.calendar);
+      if (s.ticketPhotos) setTicketPhotos(s.ticketPhotos);
+      if (s.vendorRatings) setVendorRatings(s.vendorRatings);
+      if (s.notifications) setNotifications(s.notifications);
+    } catch { /* ignore corrupt snapshot */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, notifications }));
+    } catch { /* quota / disabled */ }
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, notifications]);
+
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
     theme, setTheme,

@@ -6,7 +6,15 @@
 import { useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { buildingById } from "@/data/seed";
+import { vendorByName } from "@/data/vendors";
 import { Btn, Icon, Modal, PrioDot, SectionLabel, StatusTag, inputStyle } from "@/components/ui";
+
+type Audience = "office" | "resident" | "vendor";
+const AUD: Record<Audience, { label: string; icon: string; color: string; who: string }> = {
+  office: { label: "Office", icon: "users", color: "var(--acc-text)", who: "Your Orbit office team sees this on the ticket." },
+  resident: { label: "Resident", icon: "home", color: "#3b82f6", who: "Texted to the resident — their reply comes back to the office." },
+  vendor: { label: "Vendor", icon: "hard-hat", color: "#f59e0b", who: "Logged on the ticket — use the contact below to reach them." },
+};
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -20,9 +28,10 @@ const CHECKS: { key: string; label: string }[] = [
 ];
 
 export function SuperTaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
-  const { tickets, ticketPhotos, addTicketPhoto, addTicketNote, setTicketStatus, notify } = useOrbit();
+  const { tickets, ticketPhotos, addTicketPhoto, addTicketNote, addComment, sendTicketMessage, setTicketStatus, notify } = useOrbit();
   const t = tickets.find((x) => x.id === id);
   const [note, setNote] = useState("");
+  const [aud, setAud] = useState<Audience>("office");
   const [caption, setCaption] = useState("");
   const [closeOut, setCloseOut] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -32,9 +41,17 @@ export function SuperTaskDetail({ id, onClose }: { id: string; onClose: () => vo
   const photos = ticketPhotos[id] || [];
   const closed = t.status === "Closed";
   const inReview = t.status === "Awaiting review";
+  const vendor = vendorByName(t.vendor);
 
   const toggle = (k: string) => setChecked((c) => ({ ...c, [k]: !c[k] }));
-  const addNote = () => { if (!note.trim()) return; addTicketNote(id, "Field note: " + note.trim()); setNote(""); notify("Note added"); };
+  const send = () => {
+    if (!note.trim()) return;
+    const text = note.trim();
+    if (aud === "resident") sendTicketMessage(id, { audience: "Resident", channels: ["SMS"], text });
+    else if (aud === "vendor") { addTicketNote(id, "To vendor (" + (t.vendor || "—") + "): " + text); notify("Logged · reach the vendor below"); }
+    else { addComment(id, text); notify("Sent to the office"); }
+    setNote("");
+  };
   const addPhoto = () => { addTicketPhoto(id, caption.trim() || ""); setCaption(""); };
   const submit = () => {
     const done = CHECKS.filter((c) => checked[c.key]).map((c) => c.label);
@@ -120,14 +137,41 @@ export function SuperTaskDetail({ id, onClose }: { id: string; onClose: () => vo
             ))}
           </div>
 
-          {/* field note */}
+          {/* send an update — to the office, the resident, or the vendor */}
           {!closed && (
             <>
-              <SectionLabel style={{ marginBottom: 8 }}>Add a field note</SectionLabel>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addNote()} placeholder="What did you find / do?" style={{ ...inputStyle, fontFamily: SANS }} />
-                <Btn small primary icon="send" disabled={!note.trim()} onClick={addNote}>Send</Btn>
+              <SectionLabel style={{ marginBottom: 8 }}>Send an update</SectionLabel>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                {(["office", "resident", "vendor"] as Audience[]).map((a) => {
+                  if (a === "vendor" && !t.vendor) return null;
+                  const m = AUD[a]; const on = aud === a;
+                  return (
+                    <button key={a} onClick={() => setAud(a)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 99, cursor: "pointer", background: on ? m.color + "1a" : "var(--fill-2)", border: "1px solid " + (on ? m.color : "var(--hair-3)"), color: on ? "var(--ink)" : "var(--ink-3)", fontFamily: SANS, fontSize: 12, fontWeight: on ? 600 : 500 }}>
+                      <Icon name={m.icon} size={13} color={on ? m.color : "var(--ink-4)"} />{m.label}
+                    </button>
+                  );
+                })}
               </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={aud === "resident" ? "Plain-language update for the resident…" : aud === "vendor" ? "Message about the vendor's work…" : "Note for the office…"} style={{ ...inputStyle, fontFamily: SANS }} />
+                <Btn small primary icon="send" disabled={!note.trim()} onClick={send}>Send</Btn>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)", marginTop: 7 }}>
+                <Icon name="info" size={11} color="var(--ink-4)" />{AUD[aud].who}
+              </div>
+
+              {vendor && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                  <Icon name="hard-hat" size={15} color="#f59e0b" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{vendor.name}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{vendor.phone} · awarded vendor</div>
+                  </div>
+                  <a href={"tel:" + vendor.phone.replace(/[^0-9+]/g, "")} title={"Call " + vendor.phone} style={contactBtn}><Icon name="phone" size={14} color="#22c55e" /></a>
+                  <a href={"sms:" + vendor.phone.replace(/[^0-9+]/g, "")} title="Text" style={contactBtn}><Icon name="message-square" size={14} color="#3b82f6" /></a>
+                  <a href={"mailto:" + vendor.email} title={vendor.email} style={contactBtn}><Icon name="mail" size={14} color="var(--ink-3)" /></a>
+                </div>
+              )}
             </>
           )}
         </>
@@ -135,6 +179,8 @@ export function SuperTaskDetail({ id, onClose }: { id: string; onClose: () => vo
     </Modal>
   );
 }
+
+const contactBtn = { width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--fill-2)", border: "1px solid var(--hair-3)", textDecoration: "none", flexShrink: 0 } as const;
 
 function Detail({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
