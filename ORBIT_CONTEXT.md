@@ -239,6 +239,17 @@ Operator app, fully working on seed data:
 
 ---
 
+## 6b. Production spine (in progress)
+- **Persistence:** `OrbitProvider` hydrates from `localStorage` (`orbit_state_v1`) on mount
+  and saves on change — state survives refresh. This is the local stand-in for the DB;
+  the action surface is unchanged, so the real backend swaps in behind it.
+- **Event/audit log:** every meaningful mutation calls `logEvent({ kind, entityType,
+  entityId, summary, building })` → an append-only `events` log (persisted). `eventsFor
+  (entityType, id)` queries an entity's history; the **Live Ops "Live activity"** feed renders
+  it. This is the backend-ready audit/history/"what-changed" foundation (Codex's #1).
+  Next: surface `eventsFor` in Ticket Command + Building detail; emit events from the
+  remaining mutations; then RBAC at the data layer and the real DB.
+
 ## 7. Backend plan (not built yet)
 Replace seed data behind the existing `OrbitProvider` action surface with:
 tRPC + Drizzle ORM (Postgres) + real auth (Argon2 + session/JWT), real file upload,

@@ -9,7 +9,7 @@ import { BUILDINGS, buildingById } from "@/data/seed";
 import { complianceItems } from "@/data/governance";
 import { buildingHealth, slaReport, staffPerformance } from "@/data/reports";
 import { VENDORS, coiStatus } from "@/data/vendors";
-import { Glass, SectionLabel, StatusTag, Tag } from "@/components/ui";
+import { Glass, Icon, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { HBars } from "@/components/ui/Charts";
 import { TopBar } from "@/components/shell/TopBar";
 
@@ -18,8 +18,18 @@ const MONO = "'JetBrains Mono', monospace";
 const START = new Date("2026-04-01T00:00:00").getTime();
 const fmtDate = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
+const EV_ICON: Record<string, { icon: string; color: string }> = {
+  ticket: { icon: "ticket", color: "var(--acc-text)" },
+  vote: { icon: "vote", color: "#a855f7" },
+  invoice: { icon: "circle-dollar-sign", color: "#22c55e" },
+  calendar: { icon: "calendar", color: "#14b8a6" },
+  vendor: { icon: "star", color: "#f59e0b" },
+};
+const evMeta = (kind: string) => EV_ICON[kind.split(".")[0]] || { icon: "activity", color: "var(--ink-3)" };
+const evTime = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
+
 export function LiveOpsPage() {
-  const { tickets } = useOrbit();
+  const { tickets, events } = useOrbit();
   const dayN = Math.max(1, Math.floor((Date.now() - START) / 864e5));
 
   const live = tickets.filter((t) => !t.mergedInto);
@@ -103,6 +113,36 @@ export function LiveOpsPage() {
             </div>
           </Glass>
         </div>
+
+        {/* live activity — the event/audit log, end to end */}
+        <Glass style={{ padding: 18, marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 7px #22c55e" }} />
+            <SectionLabel>Live activity</SectionLabel>
+            <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" }}>audit log · {events.length} events</span>
+          </div>
+          {events.length === 0 ? (
+            <p style={{ margin: 0, fontFamily: SANS, fontSize: 12.5, color: "var(--ink-3)" }}>Every action — routing, status changes, messages, votes, invoices — appears here in real time and is recorded to the audit log.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {events.slice(0, 10).map((e, i) => {
+                const m = evMeta(e.kind);
+                return (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 0", borderBottom: i < Math.min(9, events.length - 1) ? "1px solid var(--hair)" : "none" }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: m.color + "1a" }}>
+                      <Icon name={m.icon} size={14} color={m.color} />
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontFamily: SANS, fontSize: 12.5, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.summary}</span>
+                      <span style={{ display: "block", fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{e.actor}{e.building ? " · " + bn(e.building) : ""} · {e.entityId}</span>
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-5)" }}>{evTime(e.at)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Glass>
 
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.85fr 0.85fr", gap: 16, marginTop: 16, alignItems: "start" }}>
           <Glass style={{ padding: 18 }}>
