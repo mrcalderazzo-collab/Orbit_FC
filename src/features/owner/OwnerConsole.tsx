@@ -3,11 +3,12 @@ import { TopBar } from "@/components/shell/TopBar";
 import { Btn, Field, Glass, Icon, Modal, SectionLabel, Select, TextInput } from "@/components/ui";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ACCESS_AREAS } from "@/data/organization";
+import { CORE_PERMISSION_RULES, EMERGENCY_WORKFLOW, PRODUCTION_MODULES, PRODUCTION_SPINE_CODE } from "@/lib/operatingSpine";
 import type { Building, OrgMember, UiDirection } from "@/lib/types";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
-const TABS = ["People & access", "Departments", "Buildings", "Audit log", "Design lab"] as const;
+const TABS = ["People & access", "Departments", "Buildings", "Audit log", "Design lab", "Operating spine"] as const;
 
 export function OwnerConsole() {
   const orbit = useOrbit();
@@ -38,6 +39,7 @@ export function OwnerConsole() {
         {tab === "Buildings" && <Buildings onAdd={() => setAddBuilding(true)} />}
         {tab === "Audit log" && <Audit />}
         {tab === "Design lab" && <DesignLab />}
+        {tab === "Operating spine" && <OperatingSpine />}
       </div>
       <AddPersonModal open={addPerson} onClose={() => setAddPerson(false)} />
       <AddBuildingModal open={addBuilding} onClose={() => setAddBuilding(false)} />
@@ -161,6 +163,71 @@ function DesignLab() {
   </div>;
 }
 
+function OperatingSpine() {
+  return <div style={{ display: "grid", gridTemplateColumns: "minmax(520px, 1.2fr) minmax(360px, .8fr)", gap: 16, alignItems: "start" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Glass style={{ padding: 18, borderLeft: "3px solid var(--acc)" }}>
+        <SectionLabel style={{ marginBottom: 10 }}>Production spine</SectionLabel>
+        <h2 style={{ margin: 0, fontFamily: SANS, fontSize: 21, color: "var(--ink)" }}>The code contract for a 50-to-4000 building operating system</h2>
+        <p style={{ margin: "8px 0 0", fontFamily: SANS, fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6 }}>
+          Every module below should be backed by durable records, permission checks, events, search indexes, notifications and human-approved agents.
+        </p>
+      </Glass>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+        {PRODUCTION_MODULES.map((mod) => <Glass key={mod.id} style={{ padding: 15 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--acc)" }} />
+            <h3 style={{ ...titleText, margin: 0, fontSize: 14 }}>{mod.label}</h3>
+          </div>
+          <p style={{ margin: "0 0 10px", fontFamily: SANS, fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5 }}>{mod.purpose}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
+            {mod.entities.slice(0, 5).map((entity) => <span key={entity} style={miniPill("var(--ink-3)")}>{entity}</span>)}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 17, color: "var(--ink-3)", fontFamily: SANS, fontSize: 11.5, lineHeight: 1.55 }}>
+            {mod.mustHave.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+          <div style={{ ...muted, marginTop: 11, lineHeight: 1.45 }}>{mod.scaleNote}</div>
+        </Glass>)}
+      </div>
+    </div>
+
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Glass style={{ padding: 16 }}>
+        <SectionLabel style={{ marginBottom: 11 }}>Emergency workflow code</SectionLabel>
+        <h3 style={{ ...titleText, fontSize: 15, margin: "0 0 4px" }}>{EMERGENCY_WORKFLOW.name}</h3>
+        <p style={{ ...muted, fontFamily: SANS, fontSize: 11.5, lineHeight: 1.5 }}>{EMERGENCY_WORKFLOW.appliesTo}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 13 }}>
+          {EMERGENCY_WORKFLOW.steps.map((step, index) => <div key={step.id} style={{ display: "grid", gridTemplateColumns: "28px 1fr", gap: 10, padding: 10, borderRadius: 11, background: "var(--fill-1)", border: "1px solid var(--hair-2)" }}>
+            <span style={{ width: 24, height: 24, borderRadius: 8, display: "grid", placeItems: "center", background: "rgba(var(--acc-rgb),.12)", color: "var(--acc-text)", fontFamily: MONO, fontSize: 9, fontWeight: 800 }}>{index + 1}</span>
+            <span>
+              <span style={{ ...titleText, display: "block" }}>{step.label}</span>
+              <span style={{ ...muted, display: "block", marginTop: 3 }}>Owner: {step.ownerRole}{step.slaHours ? " · SLA " + step.slaHours + "h" : ""}</span>
+              <span style={{ ...muted, display: "block", marginTop: 5, color: "var(--ink-3)" }}>Exit: {step.exitCriteria.join(" · ")}</span>
+            </span>
+          </div>)}
+        </div>
+      </Glass>
+
+      <Glass style={{ padding: 16 }}>
+        <SectionLabel style={{ marginBottom: 11 }}>Permission rules</SectionLabel>
+        {CORE_PERMISSION_RULES.map((rule) => <div key={rule.id} style={{ padding: "9px 0", borderBottom: "1px solid var(--hair-2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={miniPill("#f4c95d")}>{rule.role}</span>
+            <span style={miniPill("#38bdf8")}>{rule.entity}</span>
+            <span style={{ ...muted, marginLeft: "auto" }}>{rule.scope}</span>
+          </div>
+          <div style={{ marginTop: 5, fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.45 }}>{rule.reason}</div>
+        </div>)}
+      </Glass>
+
+      <Glass style={{ padding: 16 }}>
+        <SectionLabel style={{ marginBottom: 10 }}>Starter code</SectionLabel>
+        <pre style={{ margin: 0, padding: 13, borderRadius: 12, background: "#05070b", border: "1px solid var(--hair-2)", color: "var(--ink-2)", fontFamily: MONO, fontSize: 10, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{PRODUCTION_SPINE_CODE}</pre>
+      </Glass>
+    </div>
+  </div>;
+}
+
 function AddPersonModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { departments, addOrgMember } = useOrbit();
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [title, setTitle] = useState(""); const [departmentId, setDepartment] = useState("operations");
@@ -196,5 +263,6 @@ function Metric({ icon, label, value, sub, color }: { icon: string; label: strin
 const titleText = { fontFamily: SANS, fontSize: 13, fontWeight: 600, color: "var(--ink)" } as const;
 const muted = { fontFamily: MONO, fontSize: 9, color: "var(--ink-4)" } as const;
 const pill = (color: string) => ({ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 10px", borderRadius: 99, border: "1px solid " + color + "44", background: color + "0c", color, fontFamily: MONO, fontSize: 8.5, fontWeight: 800, letterSpacing: ".08em" } as const);
+const miniPill = (color: string) => ({ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 99, border: "1px solid " + color + "44", background: color + "0c", color, fontFamily: MONO, fontSize: 8, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase" } as const);
 const status = (color: string) => ({ ...pill(color), width: "fit-content", padding: "3px 7px", fontSize: 8 } as const);
 const tabButton = (on: boolean) => ({ padding: "8px 12px", border: "none", borderRadius: 9, background: on ? "var(--panel-solid)" : "transparent", color: on ? "var(--ink)" : "var(--ink-3)", fontFamily: SANS, fontSize: 12, fontWeight: on ? 600 : 400, cursor: "pointer", boxShadow: on ? "0 3px 12px rgba(0,0,0,.16)" : "none" } as const);
