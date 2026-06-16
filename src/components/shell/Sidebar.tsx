@@ -12,6 +12,7 @@ const MONO = "'JetBrains Mono', monospace";
 const NAV: { sec: string; items: { id: string; label: string; icon: string; badge?: "open" | "recs" | "emg" }[] }[] = [
   { sec: "Command", items: [
     { id: "dashboard", label: "Command Deck", icon: "layout-dashboard" },
+    { id: "planner", label: "Planner", icon: "list-checks" },
     { id: "emergencies", label: "Emergency Desk", icon: "siren", badge: "emg" },
     { id: "ai", label: "AI Review", icon: "brain-circuit", badge: "recs" },
   ] },

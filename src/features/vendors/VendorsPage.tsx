@@ -5,11 +5,13 @@ import { useMemo, useState } from "react";
 import { VENDORS, coiStatus, fmtCoiDate } from "@/data/vendors";
 import { Glass, Icon, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
+import { VendorScorecard } from "./VendorScorecard";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 export function VendorsPage() {
+  const [mode, setMode] = useState<"directory" | "scorecard">("directory");
   const [trade, setTrade] = useState("All");
   const trades = useMemo(() => ["All", ...[...new Set(VENDORS.flatMap((v) => v.trades))].sort()], []);
   const list = VENDORS.filter((v) => trade === "All" || v.trades.includes(trade)).sort((a, b) => b.grade - a.grade);
@@ -20,14 +22,20 @@ export function VendorsPage() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <TopBar title="Vendors" sub={VENDORS.length + " vendors · " + expired + " COI expired · " + expiring + " expiring"} />
       <div style={{ padding: "16px 28px", display: "flex", gap: 10, alignItems: "center", borderBottom: "1px solid var(--hair-2)" }}>
-        <Select options={trades} value={trade} onChange={setTrade} style={{ width: 200 }} />
-        {(expired > 0 || expiring > 0) && (
+        <div style={{ display: "flex", gap: 2, padding: 3, borderRadius: 99, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
+          {([["directory", "Directory"], ["scorecard", "Scorecard"]] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setMode(k)} style={{ padding: "6px 14px", borderRadius: 99, border: "none", cursor: "pointer", background: mode === k ? "rgba(var(--acc-rgb),0.14)" : "transparent", color: mode === k ? "var(--ink)" : "var(--ink-3)", fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{label}</button>
+          ))}
+        </div>
+        {mode === "directory" && <Select options={trades} value={trade} onChange={setTrade} style={{ width: 200 }} />}
+        {mode === "directory" && (expired > 0 || expiring > 0) && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7, marginLeft: "auto", fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", color: "#f59e0b" }}>
             <Icon name="shield-alert" size={14} color="#f59e0b" />{expired} EXPIRED · {expiring} EXPIRING — REQUEST UPDATED COI
           </span>
         )}
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "18px 28px 28px", minHeight: 0 }}>
+        {mode === "scorecard" ? <VendorScorecard /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>
           {list.map((v) => {
             const coi = coiStatus(v);
@@ -64,6 +72,7 @@ export function VendorsPage() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

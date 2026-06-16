@@ -59,6 +59,13 @@ const SEED_CALENDAR: BuildingEvent[] = [
   { id: "cal4", buildingId: "b3", title: "Roof drain clearing before storm", kind: "Maintenance", at: addDaysISO(1) + "T08:00", by: "Tony Calabrese", source: "super", ticketId: "T-4779" },
 ];
 
+// a couple of seeded vendor ratings so the scorecard leaderboard isn't empty
+const SEED_RATINGS: Record<string, VendorRating[]> = {
+  v_otis: [{ id: "vr_s1", vendorId: "v_otis", by: "Marcus Webb", at: "Jun 10", dims: { quality: 9, communication: 8, response: 9, pricing: 7, reliability: 9, professionalism: 9 }, note: "Fast on the elevator fault, clear comms.", building: "b2" }],
+  v_nemech: [{ id: "vr_s2", vendorId: "v_nemech", by: "Diego Ramos", at: "Jun 8", dims: { quality: 8, communication: 9, response: 8, pricing: 8, reliability: 8, professionalism: 9 }, building: "b2" }],
+  v_metroflow: [{ id: "vr_s3", vendorId: "v_metroflow", by: "Priya Anand", at: "Jun 5", dims: { quality: 6, communication: 5, response: 7, pricing: 8, reliability: 5, professionalism: 6 }, note: "Cheap but slow to follow up." }],
+};
+
 // a few notifications so the bell has live-looking history on first load
 const SEED_NOTIFS: OrbitNotification[] = [
   { id: "nts1", at: "09:42", kind: "ticket", title: "Otis on-site at Vesper House", detail: "Diego logged progress on T-4801 — isolating the sensor board.", building: "b2", ref: { page: "tickets", id: "T-4801" }, read: false },
@@ -77,6 +84,8 @@ export interface Shift { id: string; userId: string; building: string; in: strin
 export interface BuildingEvent { id: string; buildingId: string; title: string; kind: string; at: string; by: string; source: "super" | "office"; note?: string; ticketId?: string }
 /** a photo attached to a ticket from the field */
 export interface TicketPhoto { id: string; url: string; caption: string; by: string; at: string }
+/** a vendor performance rating across six dimensions (0–10 each) */
+export interface VendorRating { id: string; vendorId: string; by: string; at: string; dims: Record<string, number>; note?: string; building?: string }
 /** a real-time activity notification */
 export type NotifKind = "ticket" | "vote" | "message" | "finance" | "calendar" | "system";
 export interface OrbitNotification { id: string; at: string; kind: NotifKind; title: string; detail?: string; building?: string; ref?: { page?: string; id?: string }; read: boolean }
@@ -170,6 +179,9 @@ interface OrbitState {
   // field photos on a ticket
   ticketPhotos: Record<string, TicketPhoto[]>;
   addTicketPhoto: (ticketId: string, caption: string) => void;
+  // vendor scorecard ratings
+  vendorRatings: Record<string, VendorRating[]>;
+  rateVendor: (vendorId: string, dims: Record<string, number>, note?: string, building?: string) => void;
   // real-time notifications
   notifications: OrbitNotification[];
   pushNotification: (n: Omit<OrbitNotification, "id" | "at" | "read"> & { at?: string }) => void;
@@ -224,6 +236,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [calendar, setCalendar] = useState<BuildingEvent[]>(() => SEED_CALENDAR.map((e) => ({ ...e })));
   const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
+  const [vendorRatings, setVendorRatings] = useState<Record<string, VendorRating[]>>(() => ({ ...SEED_RATINGS }));
   const [notifications, setNotifications] = useState<OrbitNotification[]>(() => SEED_NOTIFS.map((n) => ({ ...n })));
   let _nid = 0;
   const pushNotification = useCallback<OrbitState["pushNotification"]>((n) => {
@@ -509,6 +522,12 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     notify("Photo added to " + ticketId);
   }, [ticketPhotos, currentUser, me, notify]);
 
+  const rateVendor = useCallback<OrbitState["rateVendor"]>((vendorId, dims, note, building) => {
+    const r: VendorRating = { id: "vr" + Date.now(), vendorId, by: userName(currentUser), at: stamp(), dims, note, building };
+    setVendorRatings((s) => ({ ...s, [vendorId]: [r, ...(s[vendorId] || [])] }));
+    notify("Vendor rated · scorecard updated");
+  }, [currentUser, notify]);
+
   // ── work orders ──
   const ensureWorkOrder = useCallback((t: Ticket) => {
     setWorkOrders((wos) => {
@@ -660,11 +679,12 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     shifts, activeShift, punchIn, punchOut,
     calendar, addCalendarEvent,
     ticketPhotos, addTicketPhoto,
+    vendorRatings, rateVendor,
     notifications, pushNotification, markNotificationRead, markAllNotificationsRead,
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, vendorRatings, rateVendor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }
