@@ -123,3 +123,30 @@ export function buildingHealth(tickets: Ticket[]) {
 }
 
 export const buildingName = (id: string) => buildingById(id)?.name ?? id;
+
+// ── ticket flow & volume (Analytics) ───────────────────────────────────────
+const MON_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function ticketFlowAnalytics(tickets: Ticket[]) {
+  const live = tickets.filter((t) => !t.mergedInto);
+  const created = live.map((t) => new Date(t.created).getTime());
+  // weekly inflow — last 8 weeks
+  const weekly = Array.from({ length: 8 }, (_, i) => {
+    const w = 7 - i;
+    const end = NOW - w * 7 * 864e5;
+    const start = end - 7 * 864e5;
+    return { label: i === 7 ? "This wk" : "W-" + w, value: created.filter((c) => c > start && c <= end).length };
+  });
+  // monthly volume — last 6 months
+  const monthly = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(NOW);
+    d.setMonth(d.getMonth() - (5 - i));
+    const y = d.getFullYear(), m = d.getMonth();
+    return { label: MON_NAMES[m], value: created.filter((c) => { const cd = new Date(c); return cd.getFullYear() === y && cd.getMonth() === m; }).length };
+  });
+  // team comparison
+  const team = ["nick", "luke", "cait", "gidi", "maura"].map((id) => {
+    const mine = live.filter((t) => t.assignee === id && t.status !== "Closed");
+    return { member: PEOPLE[id].name, open: mine.length, overdue: mine.filter((t) => ticketFlow(t).sla.breached).length, avgAgeDays: mine.length ? Math.round(mine.reduce((a, t) => a + Math.max(0, (NOW - new Date(t.created).getTime()) / 864e5), 0) / mine.length) : 0 };
+  });
+  return { weekly, monthly, team, total: live.length, active: live.filter((t) => t.status !== "Closed").length };
+}

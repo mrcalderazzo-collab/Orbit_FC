@@ -14,6 +14,8 @@ import { ReportsPage } from "@/features/reports/ReportsPage";
 import { AIReviewPage } from "@/features/ai/AIReviewPage";
 import { RoleDashboard } from "@/features/dashboard/RoleDashboard";
 import { PlannerPage } from "@/features/planner/PlannerPage";
+import { DataCenterPage } from "@/features/datacenter/DataCenterPage";
+import { LiveOpsPage } from "@/features/live/LiveOpsPage";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { ComingSoon } from "@/features/placeholder/ComingSoon";
 import { Portal } from "@/features/portal/Portal";
@@ -33,6 +35,8 @@ function CurrentPage() {
       return <RoleDashboard />;
     case "planner":
       return <PlannerPage />;
+    case "live":
+      return <LiveOpsPage />;
     case "emergencies":
       return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
     case "buildings":
@@ -47,6 +51,8 @@ function CurrentPage() {
       return <FinancePage />;
     case "reports":
       return <ReportsPage />;
+    case "datacenter":
+      return <DataCenterPage />;
     case "integrations":
       return <ComingSoon title="Integrations" icon="blocks" note="Connect Gmail, Slack, QuickBooks, DocuSign, Stripe and more — intake routing, ledger sync, e-signing." />;
     case "vendors":

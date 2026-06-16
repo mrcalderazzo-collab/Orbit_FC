@@ -154,7 +154,18 @@ Operator app, fully working on seed data:
 - **Finance**: portfolio overview (AP from work-order invoices, KPIs, spend-by-building) +
   **per-building drill-down** (pick a building → its own reserve trajectory, income/expense
   charts, NOI/delinquency, AP, capital commitments). Charts via shared `components/ui/Charts`.
-- **Reports center** (`features/reports/`, derivations in `data/reports.ts`): vendor
+- **Planner** (`features/planner/`): personal daily command — KPI strip, 7-day strip by
+  Next Touch, Priority Ranking Top 10 (emergency>overdue>due>age), Today's Schedule, Quick
+  Stats, Notes. **Live Ops** (`features/live/`): single dense board — LIVE day counter, pulse
+  KPIs, Operations Health Index, upcoming local-law deadlines, recent tickets, team workload,
+  by-type. **Data Center** (`features/datacenter/`, `data/datacenter.ts`): AI ops actions —
+  Offload Plan, Quick Wins, Stale Audit, Capacity Planner, Pattern Detection, Cost
+  Intelligence, Building Personalities — each generates a summary + table + CSV; link cards to
+  Front Desk / Scorecard / Reports. **Vendor Scorecard** (Vendors page Directory|Scorecard
+  toggle): rate on 6 dims → composite + letter grade, Leaderboard, Deep Dive; `vendorRatings`
+  store. (All ported from the Daisy/Orion build.)
+- **Reports center** (`features/reports/`, derivations in `data/reports.ts`): **Ticket flow &
+  volume** (weekly inflow + monthly volume + team comparison) plus vendor
   performance & pricing, CSAT/TSAT, SLA, preventative maintenance, ticket bottlenecks, staff
   performance/rates/utilization, building-health composite — each with KPIs + chart + table
   and **CSV export**. Operator nav under Finance & Network (perm `reports`).

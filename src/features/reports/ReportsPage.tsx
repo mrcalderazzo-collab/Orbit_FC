@@ -5,15 +5,16 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import { fmtMoney } from "@/lib/format";
-import { vendorPerformance, vendorPricing, satisfaction, slaReport, preventative, bottlenecks, staffPerformance, buildingHealth, type ReportTable } from "@/data/reports";
+import { vendorPerformance, vendorPricing, satisfaction, slaReport, preventative, bottlenecks, staffPerformance, buildingHealth, ticketFlowAnalytics, type ReportTable } from "@/data/reports";
 import { Btn, Glass, Icon, SectionLabel } from "@/components/ui";
-import { HBars } from "@/components/ui/Charts";
+import { HBars, LineArea, BarPairs } from "@/components/ui/Charts";
 import { TopBar } from "@/components/shell/TopBar";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 const REPORTS: { id: string; label: string; icon: string; desc: string }[] = [
+  { id: "ticketflow", label: "Ticket flow & volume", icon: "trending-up", desc: "Weekly inflow, monthly volume & team comparison" },
   { id: "vendors", label: "Vendor performance", icon: "star", desc: "Grade, rating, response & on-time by vendor" },
   { id: "pricing", label: "Vendor pricing", icon: "tags", desc: "Average ticket & variance vs market rate" },
   { id: "satisfaction", label: "CSAT / TSAT", icon: "smile", desc: "Resident & team satisfaction" },
@@ -39,7 +40,7 @@ function downloadCSV(name: string, table: ReportTable) {
 
 export function ReportsPage() {
   const { tickets, notify } = useOrbit();
-  const [sel, setSel] = useState("vendors");
+  const [sel, setSel] = useState("ticketflow");
   const meta = REPORTS.find((r) => r.id === sel)!;
   const built = useMemo<Built>(() => build(sel, tickets), [sel, tickets]);
 
@@ -119,6 +120,24 @@ function Table({ table }: { table: ReportTable }) {
 
 // ── builders ─────────────────────────────────────────────────────────────────
 function build(id: string, tickets: Parameters<typeof slaReport>[0]): Built {
+  if (id === "ticketflow") {
+    const a = ticketFlowAnalytics(tickets);
+    return {
+      kpis: [
+        { label: "Total tickets", value: String(a.total) },
+        { label: "Active", value: String(a.active), color: "#3b82f6" },
+        { label: "New this week", value: String(a.weekly[a.weekly.length - 1].value) },
+        { label: "New this month", value: String(a.monthly[a.monthly.length - 1].value) },
+      ],
+      viz: <>
+        <SectionLabel style={{ marginBottom: 12 }}>Weekly inflow — new tickets</SectionLabel>
+        <LineArea points={a.weekly.map((w) => w.value)} labels={a.weekly.map((w) => w.label)} color="var(--acc)" />
+        <SectionLabel style={{ margin: "20px 0 12px" }}>Monthly volume</SectionLabel>
+        <BarPairs data={a.monthly.map((m) => ({ label: m.label, a: m.value, b: 0 }))} aColor="#3b82f6" bColor="transparent" />
+      </>,
+      table: { columns: [{ key: "member", label: "Member" }, { key: "open", label: "Open", align: "right" }, { key: "overdue", label: "Overdue", align: "right" }, { key: "avgAgeDays", label: "Avg age (d)", align: "right" }], rows: a.team },
+    };
+  }
   if (id === "vendors") {
     const rows = vendorPerformance();
     return {

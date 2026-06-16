@@ -12,6 +12,7 @@ const MONO = "'JetBrains Mono', monospace";
 const NAV: { sec: string; items: { id: string; label: string; icon: string; badge?: "open" | "recs" | "emg" }[] }[] = [
   { sec: "Command", items: [
     { id: "dashboard", label: "Command Deck", icon: "layout-dashboard" },
+    { id: "live", label: "Live Ops", icon: "radio" },
     { id: "planner", label: "Planner", icon: "list-checks" },
     { id: "emergencies", label: "Emergency Desk", icon: "siren", badge: "emg" },
     { id: "ai", label: "AI Review", icon: "brain-circuit", badge: "recs" },
@@ -25,6 +26,7 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
   { sec: "Finance & Network", items: [
     { id: "finance", label: "Finance", icon: "circle-dollar-sign" },
     { id: "reports", label: "Reports", icon: "bar-chart-3" },
+    { id: "datacenter", label: "Data Center", icon: "database" },
     { id: "vendors", label: "Vendors", icon: "wrench" },
     { id: "integrations", label: "Integrations", icon: "blocks" },
   ] },
