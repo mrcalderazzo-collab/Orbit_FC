@@ -5,7 +5,7 @@ import { fmtMoney, fmtPct } from "@/lib/format";
 import { ticketFlow } from "@/data/flow";
 import { BUILDINGS, PEOPLE, ROSTER } from "@/data/seed";
 import { BUILDING_CHANGES, BUILDING_FILES, BUILDING_RECORDS, BUILDING_SYSTEMS, BUILDING_TOUR_AREAS, SITE_VISITS } from "@/data/buildings";
-import { useOrbit } from "@/store/OrbitProvider";
+import { useOrbit, type OrbitEvent } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
 import { BuildingMap } from "./BuildingMap";
@@ -14,7 +14,7 @@ import { buildingImage } from "@/data/buildings";
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
-type DetailTab = "overview" | "visits" | "walkthrough" | "systems" | "people" | "tickets" | "files";
+type DetailTab = "overview" | "visits" | "walkthrough" | "systems" | "people" | "tickets" | "activity" | "files";
 
 const SYSTEM_META: Record<BuildingSystem["state"], { label: string; color: string; icon: string }> = {
   healthy: { label: "Healthy", color: "#22c55e", icon: "circle-check" },
@@ -230,7 +230,7 @@ function BuildingList({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) =
 
 
 function BuildingDetail({ building, onBack }: { building: Building; onBack: () => void }) {
-  const { tickets, notices, workOrders, openCommand, nav } = useOrbit();
+  const { tickets, notices, workOrders, events, openCommand, nav } = useOrbit();
   const [tab, setTab] = useState<DetailTab>("overview");
   const systems = BUILDING_SYSTEMS.filter((system) => system.buildingId === building.id);
   const records = BUILDING_RECORDS.filter((record) => record.buildingId === building.id);
@@ -239,6 +239,12 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
   const changes = BUILDING_CHANGES.filter((change) => change.buildingId === building.id);
   const tourAreas = BUILDING_TOUR_AREAS.filter((area) => area.buildingId === building.id);
   const buildingTickets = tickets.filter((ticket) => ticket.building === building.id && !ticket.mergedInto);
+  const buildingTicketIds = new Set(buildingTickets.map((ticket) => ticket.id));
+  const buildingEvents = events.filter((event) =>
+    event.building === building.id ||
+    (event.entityType === "building" && event.entityId === building.id) ||
+    (event.entityType === "ticket" && buildingTicketIds.has(event.entityId))
+  );
   const activeTickets = buildingTickets.filter((ticket) => ticket.status !== "Closed");
   const manager = PEOPLE[building.am];
   const roster = ROSTER[building.id];
@@ -279,6 +285,7 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
           ["systems", "Systems", "activity", riskSystems.length],
           ["people", "People", "users", 1 + roster.staff.length + roster.board.length],
           ["tickets", "Tickets", "ticket", activeTickets.length],
+          ["activity", "Activity", "history", buildingEvents.length],
           ["files", "Files & changes", "folder-kanban", dueRecords.length],
         ] as const).map(([key, label, icon, badge]) => (
           <button key={key} onClick={() => setTab(key)} className={tab === key ? "building-tab active" : "building-tab"}>
@@ -307,6 +314,7 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
         {tab === "systems" && <SystemsTab systems={systems} onTicket={openCommand} />}
         {tab === "people" && <PeopleTab building={building} />}
         {tab === "tickets" && <TicketsTab tickets={buildingTickets} onTicket={openCommand} />}
+        {tab === "activity" && <BuildingActivityTab events={buildingEvents} onTicket={openCommand} />}
         {tab === "files" && <FilesChangesTab files={files} records={records} changes={changes} onTicket={openCommand} />}
       </div>
     </div>
@@ -488,6 +496,62 @@ function TicketsTab({ tickets, onTicket }: { tickets: Ticket[]; onTicket: (id: s
         );
       })}
     </Glass>
+  );
+}
+
+function BuildingActivityTab({ events, onTicket }: { events: OrbitEvent[]; onTicket: (id: string) => void }) {
+  const ticketEvents = events.filter((event) => event.entityType === "ticket").length;
+  const invoiceEvents = events.filter((event) => event.kind === "invoice_recorded").length;
+  const communicationEvents = events.filter((event) => event.kind.includes("message") || event.kind.includes("comment")).length;
+
+  return (
+    <div className="building-overview-grid">
+      <section>
+        <Glass style={{ padding: 17, overflow: "hidden" }}>
+          <HeaderLine title="Building activity spine" icon="history" count={events.length} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {events.length ? events.map((event) => {
+              const meta = buildingEventMeta(event.kind);
+              const canOpenTicket = event.entityType === "ticket";
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => canOpenTicket && onTicket(event.entityId)}
+                  className="attention-row"
+                  style={{ cursor: canOpenTicket ? "pointer" : "default" }}
+                >
+                  <span className="attention-row-icon" style={{ background: `color-mix(in srgb, ${meta.color} 10%, transparent)` }}>
+                    <Icon name={meta.icon} size={15} color={meta.color} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={rowTitle}>{event.summary}</span>
+                    <span style={rowSub}>{event.actor} - {formatDateTime(event.at)} - {event.entityType} {event.entityId}</span>
+                  </span>
+                  <Tag color={meta.color}>{event.kind.replaceAll("_", " ")}</Tag>
+                </button>
+              );
+            }) : (
+              <div style={{ padding: 18, border: "1px dashed var(--hair)", borderRadius: 16, fontFamily: SANS, fontSize: 13, color: "var(--ink-3)" }}>
+                No audit events are attached to this building yet. Ticket moves, vendor work, invoices, board votes, messages, and field evidence will collect here.
+              </div>
+            )}
+          </div>
+        </Glass>
+      </section>
+      <aside>
+        <Glass style={{ padding: 17, position: "sticky", top: 0 }}>
+          <SectionLabel style={{ marginBottom: 14 }}>Resume briefing</SectionLabel>
+          <p style={{ margin: "0 0 14px", fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: "var(--ink-2)" }}>
+            A building-level timeline lets any PM, owner, or backup operator understand what changed without opening every ticket.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+            <MiniMetric label="Ticket events" value={String(ticketEvents)} color={ticketEvents ? "var(--acc-text)" : "var(--ink)"} />
+            <MiniMetric label="Comms / notes" value={String(communicationEvents)} color={communicationEvents ? "#3b82f6" : "var(--ink)"} />
+            <MiniMetric label="Invoices" value={String(invoiceEvents)} color={invoiceEvents ? "#22c55e" : "var(--ink)"} />
+          </div>
+        </Glass>
+      </aside>
+    </div>
   );
 }
 
@@ -744,6 +808,24 @@ function VisitBlock({ label, values }: { label: string; values: string[] }) {
 
 function Legend({ color, label }: { color: string; label: string }) {
   return <span><i style={{ background: color }} />{label}</span>;
+}
+
+const BUILDING_EVENT_META: Record<string, { icon: string; color: string }> = {
+  ticket_created: { icon: "sparkles", color: "#3b82f6" },
+  ticket_routed: { icon: "route", color: "#a855f7" },
+  ticket_status: { icon: "git-commit-horizontal", color: "#22c55e" },
+  ticket_hold: { icon: "pause-circle", color: "#f59e0b" },
+  ticket_comment: { icon: "message-square", color: "#3b82f6" },
+  ticket_message: { icon: "send", color: "#14b8a6" },
+  ticket_photo: { icon: "image", color: "#a855f7" },
+  invoice_recorded: { icon: "receipt", color: "#22c55e" },
+  board_vote: { icon: "landmark", color: "#f59e0b" },
+  calendar_added: { icon: "calendar-plus", color: "#3b82f6" },
+  vendor_rating: { icon: "star", color: "#f59e0b" },
+};
+
+function buildingEventMeta(kind: string) {
+  return BUILDING_EVENT_META[kind] || { icon: "activity", color: "var(--acc-text)" };
 }
 
 const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("");
