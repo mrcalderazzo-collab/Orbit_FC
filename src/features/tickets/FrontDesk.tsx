@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
-import { autoRoute, teamByKey, ROUTABLE, atFrontDesk, escalationDue } from "@/data/routing";
+import { autoRoute, teamByKey, ROUTABLE, atFrontDesk, escalationDue, escalationCountdown } from "@/data/routing";
 import { buildingById } from "@/data/seed";
 import { superByBuilding } from "@/data/supers";
 import { Btn, Glass, Icon, PrioDot, Tag, inputStyle } from "@/components/ui";
@@ -20,7 +20,7 @@ interface Props { tickets: Ticket[]; flowMap: Record<string, TicketFlow>; onOpen
 export function FrontDesk({ tickets, onOpen }: Props) {
   const needsRouting = useMemo(() => tickets.filter(atFrontDesk), [tickets]);
   const onHold = useMemo(() => tickets.filter((t) => t.held && !t.mergedInto), [tickets]);
-  const escalate = useMemo(() => tickets.filter((t) => escalationDue(t, ageDays(t.created))), [tickets]);
+  const escalate = useMemo(() => tickets.filter((t) => escalationDue(t, ageDays(t.created)) || (t.team === "super" && !!t.escalateAt && t.status !== "Closed" && new Date(t.escalateAt).getTime() < Date.now())), [tickets]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -153,12 +153,18 @@ function RouteRow({ t, onOpen }: { t: Ticket; onOpen: (id: string) => void }) {
 function EscalateRow({ t, onOpen }: { t: Ticket; onOpen: (id: string) => void }) {
   const { routeTicket } = useOrbit();
   const sup = superByBuilding(t.building);
+  const cd = escalationCountdown(t.escalateAt);
   return (
     <RowShell t={t} onOpen={onOpen}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 10, flexWrap: "wrap" }}>
         <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-3)", flex: 1 }}>
           With {sup ? sup.name.split(" ")[0] : "the super"} for {ageDays(t.created)} days and not cleared — escalate to the central Facilities PM.
         </span>
+        {cd && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: cd.overdue ? "#ef4444" : "#f59e0b", background: (cd.overdue ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)"), border: "1px solid " + (cd.overdue ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.28)"), padding: "2px 7px", borderRadius: 6 }}>
+            <Icon name="timer" size={10} color={cd.overdue ? "#ef4444" : "#f59e0b"} />{cd.overdue ? "auto-escalating" : "auto in " + cd.label}
+          </span>
+        )}
         <Btn small primary icon="trending-up" onClick={() => routeTicket(t.id, "facilities", "escalated from super")}>Escalate → Facilities PM</Btn>
       </div>
     </RowShell>

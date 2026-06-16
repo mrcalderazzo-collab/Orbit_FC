@@ -54,3 +54,17 @@ export function atFrontDesk(t: Ticket): boolean {
 export function escalationDue(t: Ticket, ageDays: number): boolean {
   return effectiveTeam(t) === "super" && t.status !== "Closed" && !t.held && ageDays >= 2;
 }
+
+// how long the super has before a routine field ticket auto-escalates to the
+// central Facilities PM.
+export const ESCALATE_HOURS = 24;
+export const escalateDeadline = (fromMs: number): string => new Date(fromMs + ESCALATE_HOURS * 3600_000).toISOString();
+
+/** countdown to auto-escalation for a super-routed ticket (null if none set). */
+export function escalationCountdown(escalateAt?: string | null, nowMs: number = Date.now()): { label: string; overdue: boolean } | null {
+  if (!escalateAt) return null;
+  const ms = new Date(escalateAt).getTime() - nowMs;
+  if (ms <= 0) return { label: "overdue", overdue: true };
+  const h = Math.round(ms / 3600_000);
+  return { label: h >= 24 ? Math.round(h / 24) + "d" : h + "h", overdue: false };
+}

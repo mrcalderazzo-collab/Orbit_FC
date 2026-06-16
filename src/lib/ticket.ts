@@ -63,9 +63,10 @@ export const TICKET_GROUPS: {
   c: string;
   match: (t: Ticket) => boolean;
 }[] = [
-  { key: "inbound", label: "Front Desk", desc: "Just arrived · being routed", c: "var(--ink-4)", match: (t) => t.status === "Open" },
-  { key: "inflight", label: "In Flight", desc: "Dispatched · in progress", c: "var(--acc)", match: (t) => t.status === "Assigned" || t.status === "In progress" },
-  { key: "review", label: "Final Check", desc: "Verify & close", c: "#f59e0b", match: (t) => t.status === "Awaiting review" },
+  { key: "inbound", label: "Front Desk", desc: "Just arrived · being routed", c: "var(--ink-4)", match: (t) => t.status === "Open" && !t.held },
+  { key: "inflight", label: "In Flight", desc: "Dispatched · in progress", c: "var(--acc)", match: (t) => (t.status === "Assigned" || t.status === "In progress") && !t.held },
+  { key: "holding", label: "Holding", desc: "Paused · awaiting info (SLA paused)", c: "#f59e0b", match: (t) => !!t.held && t.status !== "Closed" },
+  { key: "review", label: "Final Check", desc: "Verify & close", c: "#f59e0b", match: (t) => t.status === "Awaiting review" && !t.held },
   { key: "resolved", label: "Closed", desc: "Resolved · chain-verified", c: "#22c55e", match: (t) => t.status === "Closed" },
 ];
 

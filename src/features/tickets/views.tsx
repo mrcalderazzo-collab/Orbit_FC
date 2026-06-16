@@ -1,9 +1,9 @@
 // Ticket queue views: grouped Queue, List, Cards, Kanban Board. Mirrors Tickets.jsx.
 import { useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
-import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, statusLabel, ticketApproval, ticketVendorName } from "@/lib/ticket";
+import { PRIO_COLOR, STATUS_COLOR, TICKET_GROUPS, slaState, ticketApproval, ticketVendorName } from "@/lib/ticket";
 import { effectiveTeam, teamByKey } from "@/data/routing";
-import { BUILDINGS, PEOPLE, TICKET_STATUS } from "@/data/seed";
+import { BUILDINGS, PEOPLE } from "@/data/seed";
 import { Avatar, Empty, Glass, Icon, PrioDot, StatusTag, Tag } from "@/components/ui";
 import { ApprovalChip } from "./ApprovalChip";
 
@@ -150,17 +150,26 @@ export function TicketCards({ tickets, onOpen }: ViewProps) {
   );
 }
 
+const BOARD_LANES: { key: string; label: string; color: string; match: (t: import("@/lib/types").Ticket) => boolean }[] = [
+  { key: "open", label: "Front Desk", color: STATUS_COLOR.Open, match: (t) => t.status === "Open" && !t.held },
+  { key: "assigned", label: "Dispatched", color: STATUS_COLOR.Assigned, match: (t) => t.status === "Assigned" && !t.held },
+  { key: "inprogress", label: "In Progress", color: STATUS_COLOR["In progress"], match: (t) => t.status === "In progress" && !t.held },
+  { key: "holding", label: "Holding", color: "#f59e0b", match: (t) => !!t.held && t.status !== "Closed" },
+  { key: "review", label: "Final Check", color: STATUS_COLOR["Awaiting review"], match: (t) => t.status === "Awaiting review" && !t.held },
+  { key: "closed", label: "Closed", color: STATUS_COLOR.Closed, match: (t) => t.status === "Closed" },
+];
+
 export function TicketBoard({ tickets, onOpen }: ViewProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, alignItems: "start" }}>
-      {TICKET_STATUS.map((col) => {
-        const items = tickets.filter((t) => t.status === col);
-        const c = STATUS_COLOR[col];
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, alignItems: "start" }}>
+      {BOARD_LANES.map((lane) => {
+        const items = tickets.filter(lane.match);
+        const c = lane.color;
         return (
-          <div key={col} style={{ minWidth: 0 }}>
+          <div key={lane.key} style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 4px 10px" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />
-              <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", color: "var(--ink-2)", textTransform: "uppercase" }}>{statusLabel(col)}</span>
+              <span style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.1em", color: "var(--ink-2)", textTransform: "uppercase" }}>{lane.label}</span>
               <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginLeft: "auto" }}>{items.length}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

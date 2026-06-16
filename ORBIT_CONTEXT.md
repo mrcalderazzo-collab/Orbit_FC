@@ -121,6 +121,14 @@ Operator app, fully working on seed data:
   Desk**, Assigned→**Dispatched**, In progress→**In Progress**, Awaiting review→**Final
   Check**, Closed→**Closed**; queue groups: Front Desk · In Flight · Final Check · Closed.
   Applied in StatusTag, the status mover, Kanban headers, and queue groups.
+- **Holding is a first-class lane:** held tickets get their own group in the Queue and their
+  own Kanban column (pulled out of their status lane), so the pipeline reads Front Desk →
+  In Flight → Holding → Final Check → Closed. **Auto-escalation timers:** routing a routine
+  field ticket to the super sets `Ticket.escalateAt` (now + 24h, `ESCALATE_HOURS`); an
+  OrbitProvider interval sweep auto-escalates past-deadline super tickets to the central
+  Facilities PM (with a notification) — no button needed. The Front Desk escalate lane shows
+  a live countdown ("auto in 6h" / "auto-escalating"). do-date is now labelled **"Next
+  Touch"** throughout; Work Tickets view toggle shows Front Desk / My Queue count badges.
 - **Ticket Command workspace** (full-screen): header (status mover, **do-date**, SLA,
   **Escalate**, **Close out**, **Message** dock), Uber-style stage tracker w/ conditional
   Board Vote, tabs: **Overview** (Resume·handoff briefing, AI triage panel, subtasks w/

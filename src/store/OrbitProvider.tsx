@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -43,7 +44,7 @@ import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoS
 import { WO_STAGES } from "@/data/workorders";
 import { SEED_NOTICES, type Notice } from "@/data/notices";
 import { userById, userName } from "@/data/identity";
-import { autoRoute, teamByKey } from "@/data/routing";
+import { autoRoute, teamByKey, escalateDeadline } from "@/data/routing";
 
 // a few do-dates so the Focus board has content on first load
 const SEED_WORK_DATES: Record<string, string> = {
@@ -290,7 +291,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       log: [logLine(me(), "Ticket created")],
       ...data,
     } as Ticket;
-    const routed: Ticket = { ...t, team: data.team ?? autoRoute(t).team };
+    const team = data.team ?? autoRoute(t).team;
+    const routed: Ticket = { ...t, team, escalateAt: team === "super" ? escalateDeadline(Date.now()) : null };
     setTickets((ts) => [routed, ...ts]);
     notify(id + " created");
     pushNotification({ kind: "ticket", title: "New ticket · " + (data.title || id), detail: (buildingById(data.building)?.name ?? data.building) + " · from " + (data.requester || "intake"), building: data.building, ref: { page: "tickets", id } });
@@ -302,7 +304,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     setTickets((ts) => ts.map((t) => {
       if (t.id !== id) return t;
       const lead = def?.lead ?? null;
-      return { ...t, team, held: null, assignee: lead ?? t.assignee, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine(me(), "Routed → " + (def?.label || team) + (note ? " · " + note : ""))] };
+      return { ...t, team, held: null, escalateAt: team === "super" ? escalateDeadline(Date.now()) : null, assignee: lead ?? t.assignee, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine(me(), "Routed → " + (def?.label || team) + (note ? " · " + note : ""))] };
     }));
     notify("Routed to " + (def?.label || team));
     const tk = TICKETS.find((x) => x.id === id);
@@ -619,6 +621,25 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       }, 1400);
     }
   }, [me]);
+
+  // ── auto-escalation: super-first tickets that pass their window escalate to
+  //    the central Facilities PM on their own (no button required). ──
+  const ticketsRef = useRef(tickets);
+  ticketsRef.current = tickets;
+  useEffect(() => {
+    const sweep = () => {
+      const now = Date.now();
+      const due = ticketsRef.current.filter((t) => t.team === "super" && t.escalateAt && t.status !== "Closed" && t.status !== "In progress" && new Date(t.escalateAt).getTime() < now);
+      if (!due.length) return;
+      const dueIds = new Set(due.map((d) => d.id));
+      setTickets((ts) => ts.map((t) => dueIds.has(t.id)
+        ? { ...t, team: "facilities", escalateAt: null, assignee: t.assignee ?? "luke", status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, [stamp(), "nick", "Auto-escalated → Facilities PM — super window elapsed"] as [string, string, string]] }
+        : t));
+      due.forEach((d) => pushNotification({ kind: "ticket", title: d.id + " auto-escalated → Facilities PM", detail: d.title + " · super window elapsed", building: d.building, ref: { page: "tickets", id: d.id } }));
+    };
+    const iv = setInterval(sweep, 60_000);
+    return () => clearInterval(iv);
+  }, [pushNotification]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,

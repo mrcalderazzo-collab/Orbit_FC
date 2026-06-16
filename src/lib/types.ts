@@ -240,6 +240,9 @@ export interface Ticket {
   /** Needs-info hold: parked pending photos/access/scope. While held it stays
    *  out of the team queues and doesn't burn the SLA clock. */
   held?: { reason: string; at: string } | null;
+  /** when routed to the building super, the deadline by which it auto-escalates
+   *  to the central Facilities PM if the super hasn't cleared it. ISO datetime. */
+  escalateAt?: string | null;
   /** operational tags (Recurring, Warranty, After-hours, …) */
   tags?: string[];
   /** full captured intake from the New Intake flow */
