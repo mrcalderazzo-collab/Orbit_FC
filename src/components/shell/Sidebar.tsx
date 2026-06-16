@@ -10,29 +10,31 @@ const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 const NAV: { sec: string; items: { id: string; label: string; icon: string; badge?: "open" | "recs" | "emg" }[] }[] = [
-  { sec: "Command", items: [
-    { id: "dashboard", label: "Command Deck", icon: "layout-dashboard" },
-    { id: "live", label: "Live Ops", icon: "radio" },
+  { sec: "Today", items: [
+    { id: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
     { id: "planner", label: "Planner", icon: "list-checks" },
-    { id: "emergencies", label: "Emergency Desk", icon: "siren", badge: "emg" },
-    { id: "ai", label: "AI Review", icon: "brain-circuit", badge: "recs" },
+    { id: "live", label: "Live Ops", icon: "radio" },
   ] },
-  { sec: "Operations", items: [
+  { sec: "Work", items: [
     { id: "tickets", label: "Work Tickets", icon: "ticket", badge: "open" },
     { id: "comms", label: "Comms", icon: "messages-square" },
-    { id: "notices", label: "Notices", icon: "megaphone" },
-    { id: "buildings", label: "Buildings", icon: "building-2" },
+    { id: "emergencies", label: "Emergency Desk", icon: "siren", badge: "emg" },
   ] },
-  { sec: "Finance & Network", items: [
+  { sec: "Portfolio", items: [
+    { id: "buildings", label: "Buildings", icon: "building-2" },
+    { id: "vendors", label: "Vendors", icon: "wrench" },
+    { id: "notices", label: "Notices", icon: "megaphone" },
+  ] },
+  { sec: "Intelligence", items: [
     { id: "finance", label: "Finance", icon: "circle-dollar-sign" },
     { id: "reports", label: "Reports", icon: "bar-chart-3" },
     { id: "datacenter", label: "Data Center", icon: "database" },
-    { id: "vendors", label: "Vendors", icon: "wrench" },
-    { id: "integrations", label: "Integrations", icon: "blocks" },
+    { id: "ai", label: "AI Review", icon: "brain-circuit", badge: "recs" },
   ] },
   { sec: "Growth & System", items: [
     { id: "sales", label: "Sales & Marketing", icon: "chart-no-axes-combined" },
     { id: "owner", label: "Owner Console", icon: "shield-check" },
+    { id: "integrations", label: "Integrations", icon: "blocks" },
   ] },
 ];
 
