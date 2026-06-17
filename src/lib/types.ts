@@ -238,8 +238,12 @@ export interface Ticket {
    *  (frontdesk · facilities · super · compliance · finance · legal · leasing). */
   team?: string | null;
   /** Needs-info hold: parked pending photos/access/scope. While held it stays
-   *  out of the team queues and doesn't burn the SLA clock. */
+   *  out of the team queues and doesn't burn the SLA clock. `at` is an ISO
+   *  timestamp (when the current hold started) so paused time is computable. */
   held?: { reason: string; at: string } | null;
+  /** cumulative milliseconds this ticket has spent on Needs-info hold across all
+   *  past (released) holds — the SLA clock subtracts this so holds don't burn SLA. */
+  heldMs?: number;
   /** when routed to the building super, the deadline by which it auto-escalates
    *  to the central Facilities PM if the super hasn't cleared it. ISO datetime. */
   escalateAt?: string | null;

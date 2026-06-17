@@ -8,7 +8,7 @@ import { ticketFlow } from "./flow";
 import { VENDORS, coiStatus } from "./vendors";
 import { BUILDING_SYSTEMS } from "./buildings";
 
-const NOW = new Date("2026-06-13T12:00:00").getTime();
+const NOW = Date.now();
 const ageDays = (iso: string) => Math.max(0, Math.round((NOW - new Date(iso).getTime()) / 864e5));
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 

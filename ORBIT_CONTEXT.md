@@ -267,6 +267,14 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Real SLA clock (✅ shipped):** SLA budget is by priority (Crit 4h / High 24h / Normal 72h
+  / Low 120h) and `elapsed` is now **real wall-clock** since `created`, minus time on
+  Needs-info hold. `Ticket.heldMs` banks released-hold time; `held.at` is now ISO and the live
+  hold subtracts too. `breached = !closed && !held && elapsed > budget`; closed → 100%/clock
+  stops. `holdForInfo`/`releaseHold` pause & resume the clock and emit `ticket.hold` events.
+  Seed `created` dates rebased to **relative** (`hAgo()` in seed.ts) for a believable spread
+  (≈3 breaches of 8 active). Fixed-date `NOW` anchors in reports/frontdesk/datacenter switched
+  to `Date.now()`. **Persistence key bumped `orbit_state_v1`→`v2`** to drop stale snapshots.
 - **Building record deepening (✅ shipped):** Systems-tab cards are clickable → a
   **System detail popup** (`SystemDetailModal` in `BuildingActions.tsx`): resolves the vendor
   via `vendorByName` (contact tel/mailto + COI status via `coiStatus` + grade), service dates,

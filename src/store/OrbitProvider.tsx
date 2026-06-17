@@ -416,14 +416,22 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   }, [me, notify, pushNotification, logEvent]);
 
   const holdForInfo = useCallback<OrbitState["holdForInfo"]>((id, reason) => {
-    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, held: { reason, at: stamp() }, log: [...t.log, logLine(me(), "On hold for info · " + reason)] } : t));
-    notify("Parked · awaiting info");
-  }, [me, notify]);
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, held: { reason, at: new Date().toISOString() }, log: [...t.log, logLine(me(), "On hold for info · " + reason)] } : t));
+    notify("Parked · SLA clock paused");
+    logEvent({ kind: "ticket.hold", entityType: "ticket", entityId: id, summary: "On hold for info · " + reason });
+  }, [me, notify, logEvent]);
 
   const releaseHold = useCallback<OrbitState["releaseHold"]>((id) => {
-    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, held: null, log: [...t.log, logLine(me(), "Info received · hold released")] } : t));
-    notify("Hold released");
-  }, [me, notify]);
+    setTickets((ts) => ts.map((t) => {
+      if (t.id !== id) return t;
+      // bank the time this hold lasted so the SLA clock stays paused for it
+      const startedMs = t.held?.at ? new Date(t.held.at).getTime() : NaN;
+      const banked = Number.isNaN(startedMs) ? 0 : Math.max(0, Date.now() - startedMs);
+      return { ...t, held: null, heldMs: (t.heldMs || 0) + banked, log: [...t.log, logLine(me(), "Info received · SLA clock resumed")] };
+    }));
+    notify("Hold released · SLA clock resumed");
+    logEvent({ kind: "ticket.hold", entityType: "ticket", entityId: id, summary: "Hold released · clock resumed" });
+  }, [me, notify, logEvent]);
 
   const assignTicket = useCallback((id: string, who: string) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, assignee: who, status: t.status === "Open" ? "Assigned" : t.status, log: [...t.log, logLine("nick", "Assigned to " + (PEOPLE[who]?.name || who))] } : t));
@@ -776,7 +784,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   // real backend that will sit behind the same action surface.)
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("orbit_state_v1");
+      const raw = localStorage.getItem("orbit_state_v2");
       if (!raw) return;
       const s = JSON.parse(raw);
       if (s.tickets) setTickets(s.tickets);
@@ -801,7 +809,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
+      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
   }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
 

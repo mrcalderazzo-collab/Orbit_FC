@@ -9,7 +9,7 @@ import { ticketFlow } from "./flow";
 import { BUILDINGS, PEOPLE, buildingById } from "./seed";
 import { BUILDING_SYSTEMS } from "./buildings";
 
-const NOW = new Date("2026-06-15T12:00:00").getTime();
+const NOW = Date.now();
 const ageDays = (iso: string) => Math.max(0, Math.round((NOW - new Date(iso).getTime()) / 864e5));
 const bn = (id: string) => buildingById(id)?.name ?? id;
 const open = (tickets: Ticket[]) => tickets.filter((t) => t.status !== "Closed" && !t.mergedInto);

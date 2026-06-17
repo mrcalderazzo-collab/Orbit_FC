@@ -151,9 +151,18 @@ export function ticketFlow(t: Ticket): TicketFlow {
   const subm = submitterPool[Math.floor(r() * submitterPool.length)];
   const media = MEDIA_SETS[t.type] || MEDIA_SETS.Facility;
 
+  // ── SLA clock (real) ──────────────────────────────────────────────────
+  // Budget is set by priority; elapsed is wall-clock since the ticket was
+  // created, minus any time spent on a Needs-info hold (past holds banked in
+  // heldMs, plus the live hold if one is open). A closed ticket's clock stops.
   const slaHrs = t.prio === "Critical" ? 4 : t.prio === "High" ? 24 : t.prio === "Normal" ? 72 : 120;
-  const elapsed = Math.round(r() * slaHrs * 1.3);
-  const breached = stage !== "closed" && elapsed > slaHrs;
+  const isClosed = stage === "closed" || t.status === "Closed";
+  const createdMs = t.created ? new Date(t.created).getTime() : Date.now();
+  const nowMs = Date.now();
+  const liveHoldMs = t.held?.at ? Math.max(0, nowMs - new Date(t.held.at).getTime()) : 0;
+  const pausedMs = (t.heldMs || 0) + liveHoldMs;
+  const elapsed = isClosed ? 0 : Math.max(0, Math.round((nowMs - createdMs - pausedMs) / 3600_000));
+  const breached = !isClosed && !t.held && elapsed > slaHrs;
 
   let bids: Bid[] = [];
   let awardedBidId: string | null = null;
@@ -248,7 +257,7 @@ export function ticketFlow(t: Ticket): TicketFlow {
     threshold,
     requiresVote,
     intake,
-    sla: { hrs: slaHrs, elapsed, breached, pct: Math.min(100, Math.round((elapsed / slaHrs) * 100)) },
+    sla: { hrs: slaHrs, elapsed, breached, pct: isClosed ? 100 : Math.min(100, Math.round((elapsed / slaHrs) * 100)) },
     bids,
     awardedBidId,
     awarded,

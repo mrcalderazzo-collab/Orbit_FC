@@ -12,8 +12,16 @@ import { Btn, Glass, Icon, PrioDot, Tag, inputStyle } from "@/components/ui";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
-const NOW = new Date("2026-06-13T12:00:00").getTime();
+const NOW = Date.now();
 const ageDays = (iso: string) => Math.max(0, Math.round((NOW - new Date(iso).getTime()) / 864e5));
+const heldSince = (iso?: string) => {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return iso;
+  const h = Math.floor(ms / 3600_000);
+  if (h < 1) return Math.max(1, Math.floor(ms / 60_000)) + "m ago";
+  return h < 24 ? h + "h ago" : Math.floor(h / 24) + "d ago";
+};
 
 interface Props { tickets: Ticket[]; flowMap: Record<string, TicketFlow>; onOpen: (id: string) => void }
 
@@ -179,7 +187,7 @@ function HoldRow({ t, onOpen }: { t: Ticket; onOpen: (id: string) => void }) {
       <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.22)", marginTop: 10 }}>
         <Icon name="pause" size={13} color="#f59e0b" />
         <span style={{ flex: 1, fontFamily: SANS, fontSize: 12, color: "var(--ink-2)" }}>Waiting on: {t.held?.reason}</span>
-        <span style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>since {t.held?.at}</span>
+        <span style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>since {heldSince(t.held?.at)}</span>
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 11 }}>
         <Btn small primary icon="play" onClick={() => { releaseHold(t.id); routeTicket(t.id, sug.team, "info received"); }}>Info in · route on</Btn>
