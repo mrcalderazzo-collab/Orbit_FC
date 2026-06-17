@@ -358,6 +358,8 @@ export interface Emergency {
   overdue: boolean;
   created: string;
   linkedTicket: string | null;
+  /** current step id in EMERGENCY_WORKFLOW (confirm · stabilize · communicate · recover) */
+  step: string;
   log: Array<[at: string, text: string, actor: string]>;
 }
 

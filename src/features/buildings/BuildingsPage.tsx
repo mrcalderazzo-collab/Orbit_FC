@@ -9,6 +9,7 @@ import { useOrbit, type OrbitEvent } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
 import { BuildingMap } from "./BuildingMap";
+import { BuildingActionBar, BuildingActionModals } from "./BuildingActions";
 import { buildingImage } from "@/data/buildings";
 
 const SANS = "Outfit, sans-serif";
@@ -273,7 +274,7 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
           </div>
           <p style={{ ...pageSub, marginTop: 5 }}>{building.address} · {building.units} units · managed by {manager.name}</p>
         </div>
-        <Btn small icon="messages-square" onClick={() => nav("comms")}>Message</Btn>
+        <BuildingActionBar building={building} onMessage={() => nav("comms")} />
         <ThemeSwitcher />
       </header>
 
@@ -309,9 +310,9 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
             onTab={setTab}
           />
         )}
-        {tab === "visits" && <SiteVisitsTab visits={visits} files={files} onTicket={openCommand} />}
+        {tab === "visits" && <SiteVisitsTab building={building} visits={visits} files={files} onTicket={openCommand} />}
         {tab === "walkthrough" && <VirtualWalkthrough areas={tourAreas} files={files} onTicket={openCommand} />}
-        {tab === "systems" && <SystemsTab systems={systems} onTicket={openCommand} />}
+        {tab === "systems" && <SystemsTab building={building} systems={systems} onTicket={openCommand} />}
         {tab === "people" && <PeopleTab building={building} />}
         {tab === "tickets" && <TicketsTab tickets={buildingTickets} onTicket={openCommand} />}
         {tab === "activity" && <BuildingActivityTab events={buildingEvents} onTicket={openCommand} />}
@@ -420,7 +421,8 @@ function OverviewTab({
   );
 }
 
-function SystemsTab({ systems, onTicket }: { systems: BuildingSystem[]; onTicket: (id: string) => void }) {
+function SystemsTab({ building, systems, onTicket }: { building: Building; systems: BuildingSystem[]; onTicket: (id: string) => void }) {
+  const [sysFor, setSysFor] = useState<BuildingSystem | null>(null);
   return (
     <div className="building-list-grid">
       {systems.map((system) => {
@@ -444,10 +446,13 @@ function SystemsTab({ systems, onTicket }: { systems: BuildingSystem[]; onTicket
               <MiniMetric label="Service vendor" value={system.vendor} />
               <MiniMetric label="Next service" value={formatDate(system.nextService)} color={system.state === "risk" ? "#ef4444" : "var(--ink)"} />
             </div>
-            {system.openTicketId && <Btn small primary icon="ticket" style={{ marginTop: 14 }} onClick={() => onTicket(system.openTicketId!)}>Open {system.openTicketId}</Btn>}
+            {system.openTicketId
+              ? <Btn small primary icon="ticket" style={{ marginTop: 14 }} onClick={() => onTicket(system.openTicketId!)}>Open {system.openTicketId}</Btn>
+              : <Btn small icon="plus" style={{ marginTop: 14 }} onClick={() => setSysFor(system)}>Create ticket from this system</Btn>}
           </Glass>
         );
       })}
+      <BuildingActionModals building={building} open={sysFor ? "ticket" : null} onClose={() => setSysFor(null)} system={sysFor ?? undefined} />
     </div>
   );
 }
@@ -501,8 +506,8 @@ function TicketsTab({ tickets, onTicket }: { tickets: Ticket[]; onTicket: (id: s
 
 function BuildingActivityTab({ events, onTicket }: { events: OrbitEvent[]; onTicket: (id: string) => void }) {
   const ticketEvents = events.filter((event) => event.entityType === "ticket").length;
-  const invoiceEvents = events.filter((event) => event.kind === "invoice_recorded").length;
-  const communicationEvents = events.filter((event) => event.kind.includes("message") || event.kind.includes("comment")).length;
+  const invoiceEvents = events.filter((event) => event.kind.startsWith("invoice")).length;
+  const communicationEvents = events.filter((event) => event.kind.includes("message") || event.kind.includes("comment") || event.kind.startsWith("notice")).length;
 
   return (
     <div className="building-overview-grid">
@@ -527,7 +532,7 @@ function BuildingActivityTab({ events, onTicket }: { events: OrbitEvent[]; onTic
                     <span style={rowTitle}>{event.summary}</span>
                     <span style={rowSub}>{event.actor} - {formatDateTime(event.at)} - {event.entityType} {event.entityId}</span>
                   </span>
-                  <Tag color={meta.color}>{event.kind.replaceAll("_", " ")}</Tag>
+                  <Tag color={meta.color}>{event.kind.replaceAll(".", " ")}</Tag>
                 </button>
               );
             }) : (
@@ -555,7 +560,8 @@ function BuildingActivityTab({ events, onTicket }: { events: OrbitEvent[]; onTic
   );
 }
 
-function SiteVisitsTab({ visits, files, onTicket }: { visits: SiteVisit[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
+function SiteVisitsTab({ building, visits, files, onTicket }: { building: Building; visits: SiteVisit[]; files: BuildingFile[]; onTicket: (id: string) => void }) {
+  const [schedule, setSchedule] = useState(false);
   return (
     <div className="site-visit-layout">
       <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -601,9 +607,10 @@ function SiteVisitsTab({ visits, files, onTicket }: { visits: SiteVisit[]; files
           {["Floor plans and access map", "Open-ticket briefings", "Vendor contact and scope", "Photo checklist by area", "Voice notes and field report", "Follow-up owners and deadlines"].map((item) => (
             <div key={item} className="visit-ready-item"><Icon name="check" size={13} color="var(--acc-text)" />{item}</div>
           ))}
-          <Btn primary small icon="calendar-plus" style={{ marginTop: 16, width: "100%" }}>Schedule site visit</Btn>
+          <Btn primary small icon="calendar-plus" style={{ marginTop: 16, width: "100%" }} onClick={() => setSchedule(true)}>Schedule site visit</Btn>
         </Glass>
       </aside>
+      <BuildingActionModals building={building} open={schedule ? "visit" : null} onClose={() => setSchedule(false)} />
     </div>
   );
 }
@@ -810,22 +817,38 @@ function Legend({ color, label }: { color: string; label: string }) {
   return <span><i style={{ background: color }} />{label}</span>;
 }
 
+// keyed by the full dotted kind first, then by family prefix (the store emits
+// dotted kinds like "ticket.created" / "calendar.add"), so both resolve cleanly.
 const BUILDING_EVENT_META: Record<string, { icon: string; color: string }> = {
-  ticket_created: { icon: "sparkles", color: "#3b82f6" },
-  ticket_routed: { icon: "route", color: "#a855f7" },
-  ticket_status: { icon: "git-commit-horizontal", color: "#22c55e" },
-  ticket_hold: { icon: "pause-circle", color: "#f59e0b" },
-  ticket_comment: { icon: "message-square", color: "#3b82f6" },
-  ticket_message: { icon: "send", color: "#14b8a6" },
-  ticket_photo: { icon: "image", color: "#a855f7" },
-  invoice_recorded: { icon: "receipt", color: "#22c55e" },
-  board_vote: { icon: "landmark", color: "#f59e0b" },
-  calendar_added: { icon: "calendar-plus", color: "#3b82f6" },
-  vendor_rating: { icon: "star", color: "#f59e0b" },
+  "ticket.created": { icon: "sparkles", color: "#3b82f6" },
+  "ticket.routed": { icon: "route", color: "#a855f7" },
+  "ticket.status": { icon: "git-commit-horizontal", color: "#22c55e" },
+  "ticket.comment": { icon: "message-square", color: "#3b82f6" },
+  "ticket.message": { icon: "send", color: "#14b8a6" },
+  "ticket.photo": { icon: "image", color: "#a855f7" },
+  "invoice.recorded": { icon: "receipt", color: "#22c55e" },
+  "vote.cast": { icon: "landmark", color: "#f59e0b" },
+  "calendar.add": { icon: "calendar-plus", color: "#3b82f6" },
+  "vendor.rated": { icon: "star", color: "#f59e0b" },
+  "notice.sent": { icon: "megaphone", color: "#f59e0b" },
+  "file.added": { icon: "file-up", color: "#a855f7" },
+  "emergency.opened": { icon: "siren", color: "#ef4444" },
+  "emergency.step": { icon: "git-commit-horizontal", color: "#ef4444" },
+  "emergency.resolved": { icon: "shield-check", color: "#22c55e" },
+};
+const EVENT_FAMILY_META: Record<string, { icon: string; color: string }> = {
+  ticket: { icon: "ticket", color: "var(--acc-text)" },
+  invoice: { icon: "receipt", color: "#22c55e" },
+  vote: { icon: "landmark", color: "#f59e0b" },
+  calendar: { icon: "calendar-plus", color: "#3b82f6" },
+  vendor: { icon: "star", color: "#f59e0b" },
+  notice: { icon: "megaphone", color: "#f59e0b" },
+  file: { icon: "file-up", color: "#a855f7" },
+  emergency: { icon: "siren", color: "#ef4444" },
 };
 
 function buildingEventMeta(kind: string) {
-  return BUILDING_EVENT_META[kind] || { icon: "activity", color: "var(--acc-text)" };
+  return BUILDING_EVENT_META[kind] || EVENT_FAMILY_META[kind.split(".")[0]] || { icon: "activity", color: "var(--acc-text)" };
 }
 
 const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("");

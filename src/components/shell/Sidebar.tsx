@@ -39,11 +39,11 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
 ];
 
 export function Sidebar() {
-  const { route, nav, currentUser, tickets, recs } = useOrbit();
+  const { route, nav, currentUser, tickets, recs, emergencies } = useOrbit();
   const counts: Record<string, number> = {
     open: tickets.filter((t) => t.status !== "Closed").length,
     recs: recs.filter((r) => r.status === "pending").length,
-    emg: 2,
+    emg: emergencies.filter((e) => e.status !== "resolved").length,
   };
   return (
     <aside style={{ width: 224, flexShrink: 0, minHeight: 0, height: "100%", display: "flex", flexDirection: "column", padding: "18px 14px", borderRight: "1px solid var(--hair-2)", background: "var(--sidebar-bg)", backdropFilter: "blur(25px)" }}>

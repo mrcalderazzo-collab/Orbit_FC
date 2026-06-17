@@ -17,6 +17,7 @@ import { PlannerPage } from "@/features/planner/PlannerPage";
 import { DataCenterPage } from "@/features/datacenter/DataCenterPage";
 import { LiveOpsPage } from "@/features/live/LiveOpsPage";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
+import { EmergencyDeskPage } from "@/features/emergencies/EmergencyDeskPage";
 import { ComingSoon } from "@/features/placeholder/ComingSoon";
 import { Portal } from "@/features/portal/Portal";
 import { OwnerConsole } from "@/features/owner/OwnerConsole";
@@ -38,7 +39,7 @@ function CurrentPage() {
     case "live":
       return <LiveOpsPage />;
     case "emergencies":
-      return <ComingSoon title="Emergency Desk" icon="siren" note="Pulse tiles (Potential / Active / Resolved), severity-striped rows, response-log timeline, and a 3-step Create Intake wizard with an optional auto-spawned linked work ticket." />;
+      return <EmergencyDeskPage />;
     case "buildings":
       return <BuildingsPage buildingId={route.id} />;
     case "owner":

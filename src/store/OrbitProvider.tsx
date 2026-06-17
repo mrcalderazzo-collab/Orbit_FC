@@ -25,6 +25,7 @@ import type {
   CrmActivity,
   CrmOpportunity,
   Department,
+  Emergency,
   MarketingCampaign,
   OrgAuditEvent,
   OrgMember,
@@ -45,6 +46,7 @@ import { WO_STAGES } from "@/data/workorders";
 import { SEED_NOTICES, type Notice } from "@/data/notices";
 import { userById, userName } from "@/data/identity";
 import { autoRoute, teamByKey, escalateDeadline } from "@/data/routing";
+import { SEED_EMERGENCIES, nextStepId, stepLabel } from "@/data/emergencies";
 
 // a few do-dates so the Focus board has content on first load
 const SEED_WORK_DATES: Record<string, string> = {
@@ -96,6 +98,8 @@ export interface OrbitNotification { id: string; at: string; kind: NotifKind; ti
 
 let _tid = 4802;
 const nextTicketId = () => "T-" + _tid++;
+let _eid = 205;
+const nextEmergencyId = () => "EM-" + _eid++;
 
 interface OrbitState {
   // routing + auth
@@ -186,6 +190,12 @@ interface OrbitState {
   // vendor scorecard ratings
   vendorRatings: Record<string, VendorRating[]>;
   rateVendor: (vendorId: string, dims: Record<string, number>, note?: string, building?: string) => void;
+  // emergency desk (runs on EMERGENCY_WORKFLOW)
+  emergencies: Emergency[];
+  declareEmergency: (data: { title: string; building: string; type: string; sev: Emergency["sev"]; onBehalf: string; channel: string; note?: string; spawnTicket?: boolean }) => string;
+  advanceEmergency: (id: string, note?: string) => void;
+  logEmergency: (id: string, text: string) => void;
+  resolveEmergency: (id: string, note?: string) => void;
   // append-only audit event log (the production spine)
   events: OrbitEvent[];
   logEvent: (e: { kind: string; entityType: string; entityId: string; summary: string; building?: string }) => void;
@@ -245,6 +255,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [calendar, setCalendar] = useState<BuildingEvent[]>(() => SEED_CALENDAR.map((e) => ({ ...e })));
   const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
   const [vendorRatings, setVendorRatings] = useState<Record<string, VendorRating[]>>(() => ({ ...SEED_RATINGS }));
+  const [emergencies, setEmergencies] = useState<Emergency[]>(() => SEED_EMERGENCIES.map((e) => ({ ...e, log: [...e.log] })));
   const [events, setEvents] = useState<OrbitEvent[]>([]);
   const eventsFor = useCallback((entityType: string, entityId: string) => events.filter((e) => e.entityType === entityType && e.entityId === entityId), [events]);
   const [notifications, setNotifications] = useState<OrbitNotification[]>(() => SEED_NOTIFS.map((n) => ({ ...n })));
@@ -326,6 +337,62 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     logEvent({ kind: "ticket.created", entityType: "ticket", entityId: id, summary: "Created · " + (data.title || id), building: data.building });
     return id;
   }, [me, notify, pushNotification, logEvent]);
+
+  // ── emergency desk (EMERGENCY_WORKFLOW) ──
+  const declareEmergency = useCallback<OrbitState["declareEmergency"]>((data) => {
+    const id = nextEmergencyId();
+    const actor = userName(currentUser);
+    const now = new Date().toISOString();
+    let linkedTicket: string | null = null;
+    if (data.spawnTicket) {
+      linkedTicket = createTicket({ title: "[Emergency] " + data.title, building: data.building, type: "Facility", prio: "Critical", requester: data.onBehalf || "Emergency Desk", desc: data.note || ("Linked work ticket for emergency " + id + " · " + data.type) });
+    }
+    const em: Emergency = {
+      id, title: data.title, building: data.building, type: data.type, sev: data.sev,
+      status: "active", onBehalf: data.onBehalf, channel: data.channel,
+      step: "confirm", nextStep: stepLabel("confirm"), nextDue: null, overdue: false,
+      created: now, linkedTicket,
+      log: [[now, "Incident declared · " + data.type + (data.note ? " — " + data.note : ""), actor]],
+    };
+    setEmergencies((es) => [em, ...es]);
+    notify("Emergency declared · " + id, "err");
+    pushNotification({ kind: "system", title: "Emergency declared · " + data.title, detail: (buildingById(data.building)?.name ?? data.building) + " · " + data.type, building: data.building, ref: { page: "emergencies" } });
+    logEvent({ kind: "emergency.opened", entityType: "emergency", entityId: id, summary: "Declared · " + data.title + " (" + data.type + ")", building: data.building });
+    return id;
+  }, [currentUser, createTicket, notify, pushNotification, logEvent]);
+
+  const advanceEmergency = useCallback<OrbitState["advanceEmergency"]>((id, note) => {
+    const em = emergencies.find((e) => e.id === id);
+    if (!em) return;
+    const next = nextStepId(em.step);
+    const actor = userName(currentUser);
+    const now = new Date().toISOString();
+    const resolved = !next;
+    setEmergencies((es) => es.map((e) => e.id !== id ? e : (
+      resolved
+        ? { ...e, status: "resolved", nextStep: "Closed", nextDue: null, overdue: false, log: [...e.log, [now, note || "Recovery complete · incident resolved", actor]] }
+        : { ...e, step: next!, nextStep: stepLabel(next!), overdue: false, log: [...e.log, [now, note || ("Advanced → " + stepLabel(next!)), actor]] }
+    )));
+    notify(resolved ? "Incident resolved" : "Advanced → " + stepLabel(next!), resolved ? "ok" : "ok");
+    logEvent({ kind: resolved ? "emergency.resolved" : "emergency.step", entityType: "emergency", entityId: id, summary: (resolved ? "Resolved · " : stepLabel(next!) + " · ") + em.title, building: em.building });
+    if (resolved) pushNotification({ kind: "system", title: "Emergency resolved · " + em.title, building: em.building, ref: { page: "emergencies" } });
+  }, [emergencies, currentUser, notify, logEvent, pushNotification]);
+
+  const resolveEmergency = useCallback<OrbitState["resolveEmergency"]>((id, note) => {
+    const em = emergencies.find((e) => e.id === id);
+    if (!em) return;
+    const actor = userName(currentUser);
+    const now = new Date().toISOString();
+    setEmergencies((es) => es.map((e) => e.id === id ? { ...e, status: "resolved", step: "recover", nextStep: "Closed", nextDue: null, overdue: false, log: [...e.log, [now, note || "Marked resolved", actor]] } : e));
+    notify("Incident resolved");
+    logEvent({ kind: "emergency.resolved", entityType: "emergency", entityId: id, summary: "Resolved · " + em.title, building: em.building });
+  }, [emergencies, currentUser, notify, logEvent]);
+
+  const logEmergency = useCallback<OrbitState["logEmergency"]>((id, text) => {
+    if (!text.trim()) return;
+    const actor = userName(currentUser);
+    setEmergencies((es) => es.map((e) => e.id === id ? { ...e, log: [...e.log, [new Date().toISOString(), text.trim(), actor]] } : e));
+  }, [currentUser]);
 
   const routeTicket = useCallback<OrbitState["routeTicket"]>((id, team, note) => {
     const def = teamByKey(team);
@@ -434,7 +501,11 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     const at = n.at || (n.status === "Scheduled" ? "Scheduled" : new Date().toISOString().slice(0, 16).replace("T", " "));
     setNotices((ns) => [{ ...n, id: "n" + Date.now(), at }, ...ns]);
     notify(n.status === "Scheduled" ? "Notice scheduled · " + n.reach + " residents" : n.status === "Draft" ? "Draft saved" : "Notice sent to " + n.reach + " residents");
-  }, [notify]);
+    if (n.status !== "Draft") {
+      pushNotification({ kind: "message", title: (n.status === "Scheduled" ? "Notice scheduled · " : "Notice sent · ") + n.title, detail: n.audience + " · " + (n.channels || []).join(" + ") + " · ~" + n.reach, building: n.building === "all" ? undefined : n.building });
+      logEvent({ kind: "notice.sent", entityType: "building", entityId: n.building, summary: (n.status === "Scheduled" ? "Notice scheduled · " : "Notice sent · ") + n.title + " → " + n.audience, building: n.building === "all" ? undefined : n.building });
+    }
+  }, [notify, pushNotification, logEvent]);
 
   const appendOrgAudit = useCallback((action: string, target: string) => {
     setOrgAudit((events) => [{
@@ -706,6 +777,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       if (s.calendar) setCalendar(s.calendar);
       if (s.ticketPhotos) setTicketPhotos(s.ticketPhotos);
       if (s.vendorRatings) setVendorRatings(s.vendorRatings);
+      if (s.emergencies) setEmergencies(s.emergencies);
       if (s.notifications) setNotifications(s.notifications);
       if (s.events) setEvents(s.events);
     } catch { /* ignore corrupt snapshot */ }
@@ -713,9 +785,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, notifications, events }));
+      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
-  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, notifications, events]);
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
@@ -737,12 +809,13 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     calendar, addCalendarEvent,
     ticketPhotos, addTicketPhoto,
     vendorRatings, rateVendor,
+    emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency,
     events, logEvent, eventsFor,
     notifications, pushNotification, markNotificationRead, markAllNotificationsRead,
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, vendorRatings, rateVendor, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

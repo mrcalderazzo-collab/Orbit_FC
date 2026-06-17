@@ -247,8 +247,23 @@ Operator app, fully working on seed data:
   entityId, summary, building })` → an append-only `events` log (persisted). `eventsFor
   (entityType, id)` queries an entity's history; the **Live Ops "Live activity"** feed renders
   it. This is the backend-ready audit/history/"what-changed" foundation (Codex's #1).
-  Next: surface `eventsFor` in Ticket Command + Building detail; emit events from the
-  remaining mutations; then RBAC at the data layer and the real DB.
+  Surfaced in **Ticket Command → Activity** and **Building detail → Activity** (Codex).
+  Next: emit events from the remaining mutations; then RBAC at the data layer and the real DB.
+- **Building operational actions (✅ shipped):** `src/features/buildings/BuildingActions.tsx`
+  — header command bar (New ticket · Schedule · Send notice · Log file · Message) plus the
+  Systems-tab "Create ticket from this system" and the Site-visits "Schedule site visit"
+  button. All route through the seam (`createTicket` / `addCalendarEvent` / `sendNotice` /
+  `logEvent`) and land on the event spine, so a building's Activity tab shows its own history.
+  `sendNotice` now emits a `notice.sent` event + notification. Building event-meta is keyed by
+  dotted prefix (repaired a latent underscore/dotted mismatch).
+- **Emergency Desk (✅ shipped):** `src/features/emergencies/EmergencyDeskPage.tsx`, route
+  `emergencies` (was ComingSoon). Runs on `EMERGENCY_WORKFLOW` (operatingSpine.ts): pulse
+  tiles (Active/Potential/Overdue/Resolved), a workflow rail, severity-striped incident cards
+  with a confirm→stabilize→communicate→recover stepper, per-step exit criteria, a response-log
+  timeline, inline update logging, and a "Declare emergency" modal that can auto-spawn a linked
+  Critical work ticket. Store: `emergencies` + `declareEmergency` / `advanceEmergency` /
+  `logEmergency` / `resolveEmergency` (persisted; emit `emergency.*` events). Seed in
+  `src/data/emergencies.ts`. Sidebar `emg` badge now reflects live active incidents.
 
 ## 7. Backend plan (not built yet)
 Replace seed data behind the existing `OrbitProvider` action surface with:
@@ -267,13 +282,16 @@ and the live Claude AI layer (already structured; just set `ANTHROPIC_API_KEY`).
      site visits are read-only (no "request a visit" yet).
    - **Scoping is non-negotiable:** each persona sees only their building/unit/jobs; never
      leak internal cost/vendor/notes (public tracker + scoped selectors enforce this).
-2. **Make Buildings operational:** directory now has Grid/List/Map views (✅). Still to wire:
-   log/schedule a site visit, "create work ticket" from a failing system, upload a file/photo,
-   schedule service (detail tabs are still read-only).
-3. **Emergency Desk** (spec): pulse tiles, response-log timeline, 3-step intake wizard that
-   can auto-spawn a linked work ticket.
-4. Decide & settle the **inline-vs-CSS-class** convention; add lint.
-5. Optimize the Lucide bundle (currently imports the full set, ~225KB gzip).
+2. **Make Buildings operational:** ✅ **shipped** — header command bar + Systems→ticket +
+   Schedule-visit, all through the seam & event spine (see §6b). Remaining: real binary file
+   upload (Log file currently records to the activity spine, no storage yet).
+3. **Emergency Desk:** ✅ **shipped** on `EMERGENCY_WORKFLOW` (see §6b). Remaining: per-step
+   SLA countdown timers + auto-overdue sweep (today `overdue` is a static flag on seed data).
+4. **RBAC enforcement:** turn `CORE_PERMISSION_RULES` (operatingSpine.ts) into a real
+   `can(user, action, entity, scope)` check used across the UI, replacing the flat perm list.
+5. **Real comms / file storage / real backend** — need infra decisions (Postgres/auth/S3).
+6. Decide & settle the **inline-vs-CSS-class** convention; add lint.
+7. Optimize the Lucide bundle (currently imports the full set, ~225KB gzip).
 
 ---
 
