@@ -9,6 +9,7 @@ import { TopBar } from "@/components/shell/TopBar";
 import { PortfolioCockpit } from "@/features/cockpit/PortfolioCockpit";
 import { DirectorRollup } from "@/features/cockpit/DirectorRollup";
 import { DispatchBoard } from "@/features/cockpit/DispatchBoard";
+import { ReputationStudio } from "@/features/growth/ReputationStudio";
 import { WIDGETS } from "./widgets";
 
 const MONO = "'JetBrains Mono', monospace";
@@ -45,6 +46,7 @@ export function RoleDashboard() {
   if (role === "am") return <PortfolioCockpit />;       // PM portfolio triage
   if (role === "director") return <DirectorRollup />;    // agency manage-by-exception
   if (role === "field" || role === "dispatch") return <DispatchBoard />; // geo-batch dispatch
+  if (role === "marketing") return <ReputationStudio />;  // reputation + sales proof pack
 
   // scope: everyone else sees the buildings their role is scoped to (org-wide
   // roles → the whole portfolio).
