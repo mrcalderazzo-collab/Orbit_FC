@@ -256,6 +256,17 @@ Operator app, fully working on seed data:
   `logEvent`) and land on the event spine, so a building's Activity tab shows its own history.
   `sendNotice` now emits a `notice.sent` event + notification. Building event-meta is keyed by
   dotted prefix (repaired a latent underscore/dotted mismatch).
+- **Portfolio scoping / RBAC spine (✅ shipped):** `src/data/identity.ts` —
+  `isOrgWide(u)`, `operatorBuildings(u)`, `operatorBuildingIds(u)`, `scopeToPortfolio(u, rows)`,
+  and `can(u, action, entity)` (derived from `CORE_PERMISSION_RULES`). An AM's portfolio =
+  buildings where `building.am === u.who`; org-wide roles (owner/principal/director/manager/
+  dispatch/sales/marketing) see everything. This is the layer every role cockpit/dashboard/
+  notification should filter by — the seam the real RBAC backend implements.
+- **PM cockpit (✅ shipped):** `src/features/cockpit/PortfolioCockpit.tsx` — the account/
+  property manager now lands here (RoleDashboard short-circuits `role === "am"`) instead of the
+  generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
+  from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
+  Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
 - **Emergency Desk (✅ shipped):** `src/features/emergencies/EmergencyDeskPage.tsx`, route
   `emergencies` (was ComingSoon). Runs on `EMERGENCY_WORKFLOW` (operatingSpine.ts): pulse
   tiles (Active/Potential/Overdue/Resolved), a workflow rail, severity-striped incident cards
@@ -287,8 +298,11 @@ and the live Claude AI layer (already structured; just set `ANTHROPIC_API_KEY`).
    upload (Log file currently records to the activity spine, no storage yet).
 3. **Emergency Desk:** ✅ **shipped** on `EMERGENCY_WORKFLOW` (see §6b). Remaining: per-step
    SLA countdown timers + auto-overdue sweep (today `overdue` is a static flag on seed data).
-4. **RBAC enforcement:** turn `CORE_PERMISSION_RULES` (operatingSpine.ts) into a real
-   `can(user, action, entity, scope)` check used across the UI, replacing the flat perm list.
+4. **RBAC enforcement:** scoping spine + `can()` now exist (§6b). Remaining: apply
+   `scopeToPortfolio` across the operator surfaces that still scan all buildings (TicketsPage,
+   Front Desk queues, notifications, Finance) and gate write-actions through `can()`.
+   Next role cockpits on the spine: **Compliance Command** (portfolio deadline board) and the
+   **Director rollup** (manage-by-exception + per-AM workload). Then **Field/Dispatch geo-batch**.
 5. **Real comms / file storage / real backend** — need infra decisions (Postgres/auth/S3).
 6. Decide & settle the **inline-vs-CSS-class** convention; add lint.
 7. Optimize the Lucide bundle (currently imports the full set, ~225KB gzip).

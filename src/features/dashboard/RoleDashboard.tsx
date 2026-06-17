@@ -4,7 +4,9 @@
 // Adding a new position = add a layout entry; reuse or add widgets.
 import { useOrbit } from "@/store/OrbitProvider";
 import { BUILDINGS } from "@/data/seed";
+import { operatorBuildings } from "@/data/identity";
 import { TopBar } from "@/components/shell/TopBar";
+import { PortfolioCockpit } from "@/features/cockpit/PortfolioCockpit";
 import { WIDGETS } from "./widgets";
 
 const MONO = "'JetBrains Mono', monospace";
@@ -37,10 +39,13 @@ export function RoleDashboard() {
   const meta = ROLE_META[role] || ROLE_META.principal;
   const layout = LAYOUTS[role] || LAYOUTS.principal;
 
-  // scope: AMs see only the buildings they manage; everyone else, the portfolio
-  const buildings = role === "am" && currentUser?.who
-    ? BUILDINGS.filter((b) => b.am === currentUser.who)
-    : BUILDINGS;
+  // the account/property manager lands on a purpose-built, portfolio-scoped
+  // triage cockpit rather than the generic widget grid.
+  if (role === "am") return <PortfolioCockpit />;
+
+  // scope: everyone else sees the buildings their role is scoped to (org-wide
+  // roles → the whole portfolio).
+  const buildings = operatorBuildings(currentUser, BUILDINGS);
   const scoped = buildings.length ? buildings : BUILDINGS;
 
   return (

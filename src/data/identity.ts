@@ -3,8 +3,8 @@
 // demo accounts are replaced by real auth (Argon2 + session/JWT); the persona
 // + permission model carries over unchanged.
 import type { Notice } from "@/data/notices";
-import type { OrbitUser, Persona, Ticket, TicketFlow } from "@/lib/types";
-import { PEOPLE } from "./seed";
+import type { Building, OrbitUser, Persona, Ticket, TicketFlow } from "@/lib/types";
+import { BUILDINGS, PEOPLE } from "./seed";
 import { STAGE_INDEX } from "./flow";
 
 export const PERSONA_META: Record<Persona, { label: string; icon: string; tint: string }> = {
@@ -89,6 +89,74 @@ export function assignedBuildings(u: OrbitUser | null): string[] {
   if (!u) return [];
   if (u.buildings && u.buildings.length) return u.buildings;
   return u.building ? [u.building] : [];
+}
+
+// ── operator portfolio scoping (the RBAC spine: who sees which buildings) ──
+// At 40+ buildings, no operator should face the whole firehose. Org-wide roles
+// (owner/principal/director/manager/dispatch + growth) see everything; an
+// account/property manager is scoped to the buildings they own (building.am ===
+// their person id); a field manager to their assigned cluster. This is the
+// machine-readable portfolio the cockpits, dashboards, and notifications filter by.
+const ORG_WIDE_ROLES = new Set(["principal", "director", "manager", "dispatch", "sales", "marketing"]);
+
+/** true when this operator has portfolio-wide visibility (no building subset). */
+export function isOrgWide(u: OrbitUser | null): boolean {
+  if (!u || u.persona !== "operator") return false;
+  if (u.perms?.includes("all")) return true;
+  return ORG_WIDE_ROLES.has(u.role || "");
+}
+
+/** The Building[] an operator is scoped to. Org-wide → all; AM → owned; field →
+ *  assigned cluster (falls back to all if none defined). */
+export function operatorBuildings(u: OrbitUser | null, buildings: Building[] = BUILDINGS): Building[] {
+  if (!u || u.persona !== "operator") return [];
+  if (isOrgWide(u)) return buildings;
+  if (u.role === "am" && u.who) {
+    const mine = buildings.filter((b) => b.am === u.who);
+    return mine.length ? mine : buildings;
+  }
+  if (u.buildings && u.buildings.length) return buildings.filter((b) => u.buildings!.includes(b.id));
+  return buildings;
+}
+
+export function operatorBuildingIds(u: OrbitUser | null, buildings: Building[] = BUILDINGS): string[] {
+  return operatorBuildings(u, buildings).map((b) => b.id);
+}
+
+/** Filter any building-tagged collection (tickets, notices, events…) to an
+ *  operator's portfolio. Org-wide operators pass through unchanged. */
+export function scopeToPortfolio<T extends { building?: string }>(u: OrbitUser | null, rows: T[], buildings: Building[] = BUILDINGS): T[] {
+  if (isOrgWide(u)) return rows;
+  const ids = new Set(operatorBuildingIds(u, buildings));
+  return rows.filter((r) => !r.building || ids.has(r.building));
+}
+
+// ── action-level permission (derived from operatingSpine CORE_PERMISSION_RULES) ──
+// A lightweight can(user, action, entity): the operator role is mapped to the
+// production rule role, then the rule table decides. The seam the real RBAC layer
+// implements; today it gates who can approve money, route, or close.
+type CanAction = "read" | "create" | "update" | "assign" | "approve" | "dispatch" | "message" | "upload" | "pay" | "close" | "admin";
+const ROLE_ACTIONS: Record<string, CanAction[]> = {
+  principal: ["read", "create", "update", "assign", "approve", "dispatch", "message", "upload", "pay", "close", "admin"],
+  director: ["read", "create", "update", "assign", "approve", "dispatch", "message", "upload", "pay", "close", "admin"],
+  manager: ["read", "create", "update", "assign", "dispatch", "message", "upload", "close"],
+  am: ["read", "create", "update", "assign", "message", "upload", "close"],
+  dispatch: ["read", "create", "update", "assign", "dispatch", "message"],
+  field: ["read", "create", "update", "message", "upload", "close"],
+  sales: ["read", "message"],
+  marketing: ["read"],
+};
+
+/** Can this operator take `action`? When `entity` carries a building, the action
+ *  is also denied outside their portfolio (org-wide operators excepted). */
+export function can(u: OrbitUser | null, action: CanAction, entity?: { building?: string }): boolean {
+  if (!u || u.persona !== "operator") return false;
+  if (u.perms?.includes("all")) return true;
+  const allowed = ROLE_ACTIONS[u.role || ""] || ["read"];
+  if (!allowed.includes(action)) return false;
+  if (action === "read") return true;
+  if (entity?.building && !isOrgWide(u)) return operatorBuildingIds(u).includes(entity.building);
+  return true;
 }
 
 /** A superintendent's on-site work for one building: the physical/field tickets
