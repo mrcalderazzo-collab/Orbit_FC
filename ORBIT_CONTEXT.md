@@ -267,6 +267,12 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Ownership model — visibility vs ownership (✅ shipped, in progress):** the PM cockpit now
+  splits its stream into **"Owned by you"** (`assignee === user.who`) and **"In your buildings"**
+  (watching — owned by someone else or unowned, with a one-tap **Take** that assigns to me).
+  Owner shown on watch rows. Resolves the "Marcus *and* Sarah both see the same task" confusion:
+  a principal is org-wide (sees all), a PM's queue is theirs. Still TODO under #42: a Front-Desk
+  "assign to the building's AM" routing control and applying the owned/watch split to TicketsPage.
 - **Real SLA clock (✅ shipped):** SLA budget is by priority (Crit 4h / High 24h / Normal 72h
   / Low 120h) and `elapsed` is now **real wall-clock** since `created`, minus time on
   Needs-info hold. `Ticket.heldMs` banks released-hold time; `held.at` is now ISO and the live

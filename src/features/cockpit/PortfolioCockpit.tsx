@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import type { Building, Ticket } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ticketFlow } from "@/data/flow";
-import { buildingById } from "@/data/seed";
+import { buildingById, PEOPLE } from "@/data/seed";
 import { operatorBuildings, userName } from "@/data/identity";
 import { attentionOf, nextAction, ATTENTION_META, type Attention } from "@/lib/attention";
 import { statusLabel } from "@/lib/ticket";
@@ -38,6 +38,13 @@ export function PortfolioCockpit() {
       .sort((a, b) => (ATTN_RANK[a.attn] - ATTN_RANK[b.attn]) || (a.f.sla.pct < b.f.sla.pct ? 1 : -1));
   }, [active]);
 
+  // ownership: what's assigned to *me* (act) vs what's in my buildings but owned
+  // by someone else or unowned (watch / claim). This is the visibility-vs-ownership
+  // split — an org-wide principal sees everything, but a PM's queue is theirs.
+  const meId = currentUser?.who;
+  const owned = useMemo(() => queue.filter((r) => r.t.assignee === meId), [queue, meId]);
+  const watching = useMemo(() => queue.filter((r) => r.t.assignee !== meId), [queue, meId]);
+
   const myEmergencies = emergencies.filter((e) => myIds.has(e.building) && e.status !== "resolved");
   const breaching = queue.filter((r) => r.attn === "atRisk").length;
   const decisions = queue.filter((r) => r.attn === "needsAction" || r.attn === "waitingExternal").length;
@@ -46,7 +53,7 @@ export function PortfolioCockpit() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <TopBar title={`Good day, ${firstName}`} sub={`${myBuildings.length} buildings · ${active.length} active · ${queue.length} need you`} />
+      <TopBar title={`Good day, ${firstName}`} sub={`${myBuildings.length} buildings · ${owned.length} owned by you · ${watching.length} watching`} />
       <div style={{ flex: 1, overflowY: "auto", padding: "18px 28px 32px", minHeight: 0 }}>
 
         {myEmergencies.length > 0 && (
@@ -64,7 +71,7 @@ export function PortfolioCockpit() {
 
         {/* KPI strip */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16 }}>
-          <Kpi label="Need you now" value={queue.length} color={queue.length ? "#3b82f6" : "#22c55e"} icon="inbox" />
+          <Kpi label="Owned by you" value={owned.length} color={owned.length ? "#3b82f6" : "#22c55e"} icon="user-check" />
           <Kpi label="Breaching SLA" value={breaching} color={breaching ? "#ef4444" : "#22c55e"} icon="alarm-clock-off" />
           <Kpi label="Awaiting decision" value={decisions} color={decisions ? "#a855f7" : "var(--ink)"} icon="git-pull-request-draft" />
           <Kpi label="Compliance due" value={complianceDue} color={complianceDue ? "#f59e0b" : "#22c55e"} icon="shield-alert" />
@@ -72,14 +79,23 @@ export function PortfolioCockpit() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)", gap: 14, alignItems: "start" }}>
-          {/* the action stream */}
-          <Glass style={{ padding: 17 }}>
-            <Header title="Needs you now" icon="zap" count={queue.length} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {queue.length ? queue.map((r) => <QueueRow key={r.t.id} t={r.t} attn={r.attn} act={r.act} slaPct={r.f.sla.pct} />)
-                : <Empty icon="check-circle" text="Your portfolio is clear. Nothing needs a decision right now." />}
-            </div>
-          </Glass>
+          {/* the action stream — owned vs watching */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Glass style={{ padding: 17 }}>
+              <Header title="Owned by you" icon="user-check" count={owned.length} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {owned.length ? owned.map((r) => <QueueRow key={r.t.id} t={r.t} attn={r.attn} act={r.act} slaPct={r.f.sla.pct} meId={meId} />)
+                  : <Empty icon="check-circle" text="Nothing is assigned to you right now." />}
+              </div>
+            </Glass>
+            <Glass style={{ padding: 17 }}>
+              <Header title="In your buildings" icon="eye" count={watching.length} hint="watching — Take to own it" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {watching.length ? watching.map((r) => <QueueRow key={r.t.id} t={r.t} attn={r.attn} act={r.act} slaPct={r.f.sla.pct} meId={meId} watch />)
+                  : <Empty icon="check-circle" text="Everything in your buildings is owned and on track." />}
+              </div>
+            </Glass>
+          </div>
 
           {/* per-building rollup */}
           <Glass style={{ padding: 17, position: "sticky", top: 0 }}>
@@ -103,13 +119,13 @@ function EmergencyJump() {
   return <Btn small danger icon="arrow-up-right" onClick={() => nav("emergencies")}>Emergency Desk</Btn>;
 }
 
-function QueueRow({ t, attn, act, slaPct }: { t: Ticket; attn: Attention; act: { kind: string; label: string }; slaPct: number }) {
-  const { openCommand, assignTicket, escalateTicket, currentUser } = useOrbit();
+function QueueRow({ t, attn, act, slaPct, meId, watch }: { t: Ticket; attn: Attention; act: { kind: string; label: string }; slaPct: number; meId?: string; watch?: boolean }) {
+  const { openCommand, assignTicket, escalateTicket } = useOrbit();
   const meta = ATTENTION_META[attn];
-  const building = t.building;
+  const owner = t.assignee ? (PEOPLE[t.assignee]?.name?.split(" ")[0] || t.assignee) : "Unowned";
 
   const commit = () => {
-    if (act.kind === "assign" && currentUser?.who) assignTicket(t.id, currentUser.who);
+    if (act.kind === "assign" && meId) assignTicket(t.id, meId);
     else if (act.kind === "escalate") escalateTicket(t.id);
     else openCommand(t.id);
   };
@@ -122,10 +138,12 @@ function QueueRow({ t, attn, act, slaPct }: { t: Ticket; attn: Attention; act: {
           <PrioDot prio={t.prio} />
           <span style={{ fontFamily: SANS, fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
         </span>
-        <span style={{ display: "block", marginTop: 3, fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{t.id} · {buildingShort(building)} · {statusLabel(t.status)} · SLA {Math.round(slaPct)}%</span>
+        <span style={{ display: "block", marginTop: 3, fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{t.id} · {buildingShort(t.building)} · {statusLabel(t.status)} · SLA {Math.round(slaPct)}%{watch ? " · " + owner : ""}</span>
       </button>
       <Tag color={meta.color}>{meta.short}</Tag>
-      <Btn small primary onClick={commit}>{act.label}</Btn>
+      {watch
+        ? <Btn small icon="hand" onClick={() => meId && assignTicket(t.id, meId)}>Take</Btn>
+        : <Btn small primary onClick={commit}>{act.label}</Btn>}
     </div>
   );
 }
@@ -158,12 +176,13 @@ function Kpi({ label, value, color, icon }: { label: string; value: number; colo
   );
 }
 
-function Header({ title, icon, count }: { title: string; icon: string; count: number }) {
+function Header({ title, icon, count, hint }: { title: string; icon: string; count: number; hint?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 13 }}>
       <Icon name={icon} size={16} color="var(--acc-text)" />
       <span style={{ fontFamily: SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{title}</span>
       <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--acc-text)", background: "rgba(var(--acc-rgb),0.1)", padding: "2px 7px", borderRadius: 99 }}>{count}</span>
+      {hint && <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{hint}</span>}
     </div>
   );
 }
