@@ -86,6 +86,10 @@ export interface Shift { id: string; userId: string; building: string; in: strin
 export interface BuildingEvent { id: string; buildingId: string; title: string; kind: string; at: string; by: string; source: "super" | "office"; note?: string; ticketId?: string }
 /** a photo attached to a ticket from the field */
 export interface TicketPhoto { id: string; url: string; caption: string; by: string; at: string }
+/** a document filed against a building (and optionally a specific system/vendor):
+ *  COIs, contracts, manuals, reports. The real document home until object storage
+ *  lands behind the same action. */
+export interface BuildingDoc { id: string; buildingId: string; name: string; kind: string; system?: string; vendor?: string; by: string; at: string; url?: string }
 /** an append-only audit event. Every meaningful mutation emits one — the
  *  backend-ready spine for history, "what changed", and reporting. entityType +
  *  entityId tie it to a node in the portfolio graph (ticket / building / vendor…). */
@@ -187,6 +191,9 @@ interface OrbitState {
   // field photos on a ticket
   ticketPhotos: Record<string, TicketPhoto[]>;
   addTicketPhoto: (ticketId: string, caption: string) => void;
+  // building documents (COIs, contracts, manuals…) keyed by building id
+  buildingDocs: Record<string, BuildingDoc[]>;
+  addBuildingDoc: (buildingId: string, doc: { name: string; kind: string; system?: string; vendor?: string }) => void;
   // vendor scorecard ratings
   vendorRatings: Record<string, VendorRating[]>;
   rateVendor: (vendorId: string, dims: Record<string, number>, note?: string, building?: string) => void;
@@ -255,6 +262,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [calendar, setCalendar] = useState<BuildingEvent[]>(() => SEED_CALENDAR.map((e) => ({ ...e })));
   const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
   const [vendorRatings, setVendorRatings] = useState<Record<string, VendorRating[]>>(() => ({ ...SEED_RATINGS }));
+  const [buildingDocs, setBuildingDocs] = useState<Record<string, BuildingDoc[]>>({});
   const [emergencies, setEmergencies] = useState<Emergency[]>(() => SEED_EMERGENCIES.map((e) => ({ ...e, log: [...e.log] })));
   const [events, setEvents] = useState<OrbitEvent[]>([]);
   const eventsFor = useCallback((entityType: string, entityId: string) => events.filter((e) => e.entityType === entityType && e.entityId === entityId), [events]);
@@ -615,6 +623,13 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     logEvent({ kind: "ticket.photo", entityType: "ticket", entityId: ticketId, summary: "Field photo added" });
   }, [ticketPhotos, currentUser, me, notify, logEvent]);
 
+  const addBuildingDoc = useCallback<OrbitState["addBuildingDoc"]>((buildingId, doc) => {
+    const d: BuildingDoc = { id: "doc" + Date.now(), buildingId, name: doc.name, kind: doc.kind, system: doc.system, vendor: doc.vendor, by: userName(currentUser), at: stamp() };
+    setBuildingDocs((s) => ({ ...s, [buildingId]: [d, ...(s[buildingId] || [])] }));
+    notify("Document filed · " + doc.name);
+    logEvent({ kind: "file.added", entityType: "building", entityId: buildingId, summary: "Document filed · " + doc.name + " (" + doc.kind + ")" + (doc.system ? " · " + doc.system : ""), building: buildingId });
+  }, [currentUser, notify, logEvent]);
+
   const rateVendor = useCallback<OrbitState["rateVendor"]>((vendorId, dims, note, building) => {
     const r: VendorRating = { id: "vr" + Date.now(), vendorId, by: userName(currentUser), at: stamp(), dims, note, building };
     setVendorRatings((s) => ({ ...s, [vendorId]: [r, ...(s[vendorId] || [])] }));
@@ -776,6 +791,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       if (s.shifts) setShifts(s.shifts);
       if (s.calendar) setCalendar(s.calendar);
       if (s.ticketPhotos) setTicketPhotos(s.ticketPhotos);
+      if (s.buildingDocs) setBuildingDocs(s.buildingDocs);
       if (s.vendorRatings) setVendorRatings(s.vendorRatings);
       if (s.emergencies) setEmergencies(s.emergencies);
       if (s.notifications) setNotifications(s.notifications);
@@ -785,9 +801,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, emergencies, notifications, events }));
+      localStorage.setItem("orbit_state_v1", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
-  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, vendorRatings, emergencies, notifications, events]);
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
@@ -808,6 +824,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     shifts, activeShift, punchIn, punchOut,
     calendar, addCalendarEvent,
     ticketPhotos, addTicketPhoto,
+    buildingDocs, addBuildingDoc,
     vendorRatings, rateVendor,
     emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency,
     events, logEvent, eventsFor,
@@ -815,7 +832,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

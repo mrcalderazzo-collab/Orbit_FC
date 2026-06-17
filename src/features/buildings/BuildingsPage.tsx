@@ -9,7 +9,7 @@ import { useOrbit, type OrbitEvent } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
 import { BuildingMap } from "./BuildingMap";
-import { BuildingActionBar, BuildingActionModals } from "./BuildingActions";
+import { BuildingActionBar, BuildingActionModals, SystemDetailModal } from "./BuildingActions";
 import { buildingImage } from "@/data/buildings";
 
 const SANS = "Outfit, sans-serif";
@@ -316,7 +316,7 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
         {tab === "people" && <PeopleTab building={building} />}
         {tab === "tickets" && <TicketsTab tickets={buildingTickets} onTicket={openCommand} />}
         {tab === "activity" && <BuildingActivityTab events={buildingEvents} onTicket={openCommand} />}
-        {tab === "files" && <FilesChangesTab files={files} records={records} changes={changes} onTicket={openCommand} />}
+        {tab === "files" && <FilesChangesTab building={building} files={files} records={records} changes={changes} onTicket={openCommand} />}
       </div>
     </div>
   );
@@ -422,13 +422,14 @@ function OverviewTab({
 }
 
 function SystemsTab({ building, systems, onTicket }: { building: Building; systems: BuildingSystem[]; onTicket: (id: string) => void }) {
-  const [sysFor, setSysFor] = useState<BuildingSystem | null>(null);
+  const [detailSys, setDetailSys] = useState<BuildingSystem | null>(null);
+  const [ticketSys, setTicketSys] = useState<BuildingSystem | null>(null);
   return (
     <div className="building-list-grid">
       {systems.map((system) => {
         const meta = SYSTEM_META[system.state];
         return (
-          <Glass key={system.id} style={{ padding: 17 }} hover accent={meta.color}>
+          <Glass key={system.id} style={{ padding: 17, cursor: "pointer" }} hover accent={meta.color} onClick={() => setDetailSys(system)}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
               <span className="attention-row-icon" style={{ width: 38, height: 38, background: `color-mix(in srgb, ${meta.color} 10%, transparent)` }}><Icon name={meta.icon} size={18} color={meta.color} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -446,38 +447,67 @@ function SystemsTab({ building, systems, onTicket }: { building: Building; syste
               <MiniMetric label="Service vendor" value={system.vendor} />
               <MiniMetric label="Next service" value={formatDate(system.nextService)} color={system.state === "risk" ? "#ef4444" : "var(--ink)"} />
             </div>
-            {system.openTicketId
-              ? <Btn small primary icon="ticket" style={{ marginTop: 14 }} onClick={() => onTicket(system.openTicketId!)}>Open {system.openTicketId}</Btn>
-              : <Btn small icon="plus" style={{ marginTop: 14 }} onClick={() => setSysFor(system)}>Create ticket from this system</Btn>}
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+              <Btn small icon="maximize-2" onClick={() => setDetailSys(system)}>Details</Btn>
+              {system.openTicketId
+                ? <Btn small primary icon="ticket" onClick={() => onTicket(system.openTicketId!)}>Open {system.openTicketId}</Btn>
+                : <Btn small icon="plus" onClick={() => setTicketSys(system)}>Create ticket</Btn>}
+            </div>
           </Glass>
         );
       })}
-      <BuildingActionModals building={building} open={sysFor ? "ticket" : null} onClose={() => setSysFor(null)} system={sysFor ?? undefined} />
+      <SystemDetailModal building={building} system={detailSys} open={!!detailSys} onClose={() => setDetailSys(null)} onCreateTicket={(s) => { setDetailSys(null); setTicketSys(s); }} />
+      <BuildingActionModals building={building} open={ticketSys ? "ticket" : null} onClose={() => setTicketSys(null)} system={ticketSys ?? undefined} />
     </div>
   );
 }
 
+interface PersonCard { name: string; role: string; initials: string; color: string; email: string; phone: string; unit?: string; group: "internal" | "super" | "staff" | "board" }
+
 function PeopleTab({ building }: { building: Building }) {
   const roster = ROSTER[building.id];
   const manager = PEOPLE[building.am];
-  const people = [
-    { name: manager.name, role: "Account manager", initials: manager.initials, color: manager.color, internal: true },
-    { name: roster.super, role: "Resident superintendent", initials: initials(roster.super), color: building.mono },
-    ...roster.staff.map(([name, role]) => ({ name, role, initials: initials(name), color: "#3b82f6" })),
-    ...roster.board.map(([name, role]) => ({ name, role: `Board ${role}`, initials: initials(name), color: "#a855f7" })),
+  // board members are residents — give them a deterministic unit so the card is complete
+  const boardUnit = (name: string) => `${1 + (hashName(name) % Math.max(1, building.units))}${["A", "B", "C", "D", "F"][hashName(name) % 5]}`;
+  const people: PersonCard[] = [
+    { name: manager.name, role: "Account manager", initials: manager.initials, color: manager.color, email: manager.email, phone: manager.phone, group: "internal" },
+    { name: roster.super, role: "Resident superintendent", initials: initials(roster.super), color: building.mono, email: synthEmail(roster.super, "orbit.super"), phone: synthPhone(roster.super), unit: "Super's unit", group: "super" },
+    ...roster.staff.map(([name, role]): PersonCard => ({ name, role, initials: initials(name), color: "#3b82f6", email: synthEmail(name, "orbit.ops"), phone: synthPhone(name), group: "staff" })),
+    ...roster.board.map(([name, role]): PersonCard => ({ name, role: `Board ${role}`, initials: initials(name), color: "#a855f7", email: synthEmail(name, building.name.toLowerCase().replace(/[^a-z]/g, "") + "board.org"), phone: synthPhone(name), unit: boardUnit(name), group: "board" })),
   ];
+  const GROUP_LABEL: Record<PersonCard["group"], string> = { internal: "Orbit team", super: "On-site", staff: "Building staff", board: "Board" };
   return (
     <div className="building-list-grid">
       {people.map((person) => (
-        <Glass key={`${person.name}-${person.role}`} style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-          <Avatar person={{ name: person.name, initials: person.initials, color: person.color }} size={38} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{person.name}</div>
-            <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginTop: 3, textTransform: "uppercase" }}>{person.role}</div>
+        <Glass key={`${person.name}-${person.role}`} style={{ padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Avatar person={{ name: person.name, initials: person.initials, color: person.color }} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{person.name}</div>
+              <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--ink-4)", marginTop: 3, textTransform: "uppercase" }}>{person.role}</div>
+            </div>
+            <Tag color={person.group === "internal" ? "var(--acc-text)" : person.group === "board" ? "#a855f7" : "var(--ink-3)"}>{GROUP_LABEL[person.group]}</Tag>
           </div>
-          {person.internal && <Tag color="var(--acc-text)">Orbit team</Tag>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 13, paddingTop: 12, borderTop: "1px solid var(--hair-2)" }}>
+            {person.unit && <PersonLine icon="map-pin" text={person.unit} />}
+            <PersonLine icon="mail" text={person.email} />
+            <PersonLine icon="phone" text={person.phone} />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <a href={`tel:${person.phone}`} style={peopleContactBtn}><Icon name="phone" size={13} color="var(--ink-2)" />Call</a>
+            <a href={`mailto:${person.email}`} style={peopleContactBtn}><Icon name="mail" size={13} color="var(--ink-2)" />Email</a>
+          </div>
         </Glass>
       ))}
+    </div>
+  );
+}
+
+function PersonLine({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+      <Icon name={icon} size={13} color="var(--ink-4)" />
+      <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
     </div>
   );
 }
@@ -696,16 +726,35 @@ function HotspotDetail({ hotspot, files, onTicket }: { hotspot: TourHotspot; fil
   );
 }
 
-function FilesChangesTab({ files, records, changes, onTicket }: { files: BuildingFile[]; records: BuildingRecord[]; changes: typeof BUILDING_CHANGES; onTicket: (id: string) => void }) {
+function FilesChangesTab({ building, files, records, changes, onTicket }: { building: Building; files: BuildingFile[]; records: BuildingRecord[]; changes: typeof BUILDING_CHANGES; onTicket: (id: string) => void }) {
+  const { buildingDocs } = useOrbit();
   const [section, setSection] = useState<"files" | "changes" | "records">("files");
+  const docs = buildingDocs[building.id] || [];
   return (
     <div>
       <div className="building-subtabs">
-        <button onClick={() => setSection("files")} className={section === "files" ? "active" : ""}>Files <span>{files.length}</span></button>
+        <button onClick={() => setSection("files")} className={section === "files" ? "active" : ""}>Files <span>{files.length + docs.length}</span></button>
         <button onClick={() => setSection("changes")} className={section === "changes" ? "active" : ""}>Building changes <span>{changes.length}</span></button>
         <button onClick={() => setSection("records")} className={section === "records" ? "active" : ""}>Compliance records <span>{records.length}</span></button>
       </div>
-      {section === "files" && <div className="building-list-grid">{files.map((file) => <FileCard key={file.id} file={file} onTicket={onTicket} />)}</div>}
+      {section === "files" && (
+        <div className="building-list-grid">
+          {docs.map((d) => (
+            <Glass key={d.id} style={{ padding: 16 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+                <span className="attention-row-icon" style={{ width: 38, height: 38 }}><Icon name="file-text" size={18} color="var(--acc-text)" /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ ...rowTitle, fontSize: 13.5 }}>{d.name}</span>
+                  <span style={rowSub}>{d.kind}{d.system ? " · " + d.system : ""}{d.vendor ? " · " + d.vendor : ""}</span>
+                </span>
+                <Tag color="var(--acc-text)">Filed</Tag>
+              </div>
+              <div className="file-meta-row"><span>{d.at}</span><span>{d.by}</span></div>
+            </Glass>
+          ))}
+          {files.map((file) => <FileCard key={file.id} file={file} onTicket={onTicket} />)}
+        </div>
+      )}
       {section === "changes" && (
         <Glass style={{ overflow: "hidden" }}>
           {changes.map((change) => (
@@ -852,6 +901,10 @@ function buildingEventMeta(kind: string) {
 }
 
 const initials = (name: string) => name.split(" ").map((part) => part[0]).slice(0, 2).join("");
+const hashName = (name: string) => name.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+const synthEmail = (name: string, domain: string) => name.toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "") + "@" + domain;
+const synthPhone = (name: string) => "+1 (212) 555-0" + String(100 + (hashName(name) % 800));
+const peopleContactBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", padding: "7px 0", borderRadius: 9, background: "var(--fill-2)", border: "1px solid var(--hair-3)", fontFamily: "Outfit, sans-serif", fontSize: 11.5, color: "var(--ink-2)", textDecoration: "none", cursor: "pointer" };
 const formatDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const formatDateTime = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 const recordIcon = (kind: BuildingRecord["kind"]) => ({ Insurance: "shield-check", Inspection: "clipboard-check", Contract: "file-signature", Financial: "circle-dollar-sign", Governance: "landmark" }[kind]);

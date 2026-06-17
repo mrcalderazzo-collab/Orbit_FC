@@ -267,6 +267,14 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Building record deepening (✅ shipped):** Systems-tab cards are clickable → a
+  **System detail popup** (`SystemDetailModal` in `BuildingActions.tsx`): resolves the vendor
+  via `vendorByName` (contact tel/mailto + COI status via `coiStatus` + grade), service dates,
+  equipment photos, and a **documents list** (COI/contracts) with an inline file action. New
+  store collection `buildingDocs` + `addBuildingDoc` (persisted; emits `file.added`); the
+  building **Files** tab surfaces filed docs; the header "Log file" action writes here too.
+  **People tab** enriched: email, unit, phone, group tag, and Call/Email contact buttons
+  (staff/super/board contacts synthesized deterministically where not in PEOPLE).
 - **Emergency Desk (✅ shipped):** `src/features/emergencies/EmergencyDeskPage.tsx`, route
   `emergencies` (was ComingSoon). Runs on `EMERGENCY_WORKFLOW` (operatingSpine.ts): pulse
   tiles (Active/Potential/Overdue/Resolved), a workflow rail, severity-striped incident cards
