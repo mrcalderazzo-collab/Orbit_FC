@@ -7,6 +7,8 @@ import { BUILDINGS } from "@/data/seed";
 import { operatorBuildings } from "@/data/identity";
 import { TopBar } from "@/components/shell/TopBar";
 import { PortfolioCockpit } from "@/features/cockpit/PortfolioCockpit";
+import { DirectorRollup } from "@/features/cockpit/DirectorRollup";
+import { DispatchBoard } from "@/features/cockpit/DispatchBoard";
 import { WIDGETS } from "./widgets";
 
 const MONO = "'JetBrains Mono', monospace";
@@ -39,9 +41,10 @@ export function RoleDashboard() {
   const meta = ROLE_META[role] || ROLE_META.principal;
   const layout = LAYOUTS[role] || LAYOUTS.principal;
 
-  // the account/property manager lands on a purpose-built, portfolio-scoped
-  // triage cockpit rather than the generic widget grid.
-  if (role === "am") return <PortfolioCockpit />;
+  // purpose-built role cockpits on the scoping spine, in place of the generic grid:
+  if (role === "am") return <PortfolioCockpit />;       // PM portfolio triage
+  if (role === "director") return <DirectorRollup />;    // agency manage-by-exception
+  if (role === "field" || role === "dispatch") return <DispatchBoard />; // geo-batch dispatch
 
   // scope: everyone else sees the buildings their role is scoped to (org-wide
   // roles → the whole portfolio).
