@@ -18,6 +18,7 @@ import { DataCenterPage } from "@/features/datacenter/DataCenterPage";
 import { LiveOpsPage } from "@/features/live/LiveOpsPage";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { EmergencyDeskPage } from "@/features/emergencies/EmergencyDeskPage";
+import { ComplianceCommand } from "@/features/compliance/ComplianceCommand";
 import { ComingSoon } from "@/features/placeholder/ComingSoon";
 import { Portal } from "@/features/portal/Portal";
 import { OwnerConsole } from "@/features/owner/OwnerConsole";
@@ -42,6 +43,8 @@ function CurrentPage() {
       return <EmergencyDeskPage />;
     case "buildings":
       return <BuildingsPage buildingId={route.id} />;
+    case "compliance":
+      return <ComplianceCommand />;
     case "owner":
       return <OwnerConsole />;
     case "sales":

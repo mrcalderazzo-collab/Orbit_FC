@@ -267,6 +267,13 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Compliance Command (✅ shipped):** `src/features/compliance/ComplianceCommand.tsx`, route
+  `compliance` + Portfolio nav item (org-wide roles via `canSee`; manager perm added). Rolls
+  every building record (`BUILDING_RECORDS`) + every vendor COI (`coiStatus`) into one
+  deadline-ranked board (soonest first, overdue→urgent→soon→ok), with KPIs (overdue / COIs /
+  inspections / flagged buildings), a flagged-buildings rollup, a Needs-review queue, and
+  inline call/email-renewal on COI rows. Derivation-only; relative `due` dates work with the
+  real clock.
 - **Communications composer (✅ shipped):** `src/features/comms/NewConversation.tsx` — a
   "New conversation" button in CommsPage opens a recipient picker over a full **contact
   directory** (`contactDirectory()` in comms.ts: internal team, on-site supers, vendors, board

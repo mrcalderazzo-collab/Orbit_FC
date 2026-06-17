@@ -22,6 +22,7 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
   ] },
   { sec: "Portfolio", items: [
     { id: "buildings", label: "Buildings", icon: "building-2" },
+    { id: "compliance", label: "Compliance", icon: "clipboard-check" },
     { id: "vendors", label: "Vendors", icon: "wrench" },
     { id: "notices", label: "Notices", icon: "megaphone" },
   ] },
