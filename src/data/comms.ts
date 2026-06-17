@@ -5,6 +5,48 @@
 import type { Channel, ChatMessage, CommVia, Participant, Ticket, TicketFlow } from "@/lib/types";
 import { dateShift, rng, seed } from "@/lib/format";
 import { BUILDINGS, PEOPLE, ROSTER, buildingById } from "./seed";
+import { VENDORS } from "./vendors";
+
+// ── contact directory (powers the New-conversation composer) ─────────────
+export type ContactCategory = "Team" | "Vendors" | "Board" | "Residents";
+export interface DirectoryContact extends Participant {
+  category: ContactCategory;
+  sub: string;        // secondary line (role / trade / building)
+  building?: string;
+  email?: string;
+  phone?: string;
+  broadcast?: boolean; // a building-wide audience, not a single person
+}
+
+/** Everyone an operator can start a conversation with, across the portfolio. */
+export function contactDirectory(): DirectoryContact[] {
+  const out: DirectoryContact[] = [];
+  // internal team
+  Object.values(PEOPLE).forEach((p) => out.push({
+    id: "team_" + p.id, name: p.name, initials: p.initials, color: p.color, role: p.role, kind: "operator",
+    category: "Team", sub: p.role, email: p.email, phone: p.phone,
+  }));
+  // on-site supers (per building)
+  BUILDINGS.forEach((b) => { const sup = ROSTER[b.id]?.super; if (sup) out.push({
+    id: "sup_" + b.id, name: sup, initials: initials(sup), color: b.mono, role: "Superintendent · " + b.name, kind: "operator",
+    category: "Team", sub: "Superintendent · " + b.name, building: b.id,
+  }); });
+  // vendors
+  VENDORS.forEach((v) => out.push({
+    id: "ven_" + v.id, name: v.name, initials: initials(v.name), color: "#f59e0b", role: v.trades.join(" · "), kind: "vendor",
+    category: "Vendors", sub: v.trades[0], email: v.email, phone: v.phone,
+  }));
+  // board members (per building)
+  BUILDINGS.forEach((b) => boardParticipants(b.id).forEach((m) => out.push({
+    ...m, category: "Board", sub: m.role, building: b.id,
+  })));
+  // resident audiences (building-wide broadcast)
+  BUILDINGS.forEach((b) => out.push({
+    id: "resall_" + b.id, name: b.name + " · residents", initials: "RS", color: "#3b82f6", role: b.units + " units", kind: "resident",
+    category: "Residents", sub: b.units + " units · whole building", building: b.id, broadcast: true,
+  }));
+  return out;
+}
 
 // ── Orbit account team / contactable positions ──────────────────────────
 // A building's residents & board can reach any of these positions directly

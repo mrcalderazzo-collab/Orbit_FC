@@ -267,6 +267,14 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Communications composer (✅ shipped):** `src/features/comms/NewConversation.tsx` — a
+  "New conversation" button in CommsPage opens a recipient picker over a full **contact
+  directory** (`contactDirectory()` in comms.ts: internal team, on-site supers, vendors, board
+  members, building-wide resident audiences), multi-select across categories, channel
+  (In-app/SMS/Email), subject + message → creates a Channel via the new store
+  `customChannels` + `createChannel` (persisted; emits `comm.thread`). New threads appear at the
+  top of the inbox and use the existing ChatThread (send + simulated reply work). This is the
+  "start a new thread / reach multiple vendors/residents/board/internal" primitive.
 - **Ownership model — visibility vs ownership (✅ shipped, in progress):** the PM cockpit now
   splits its stream into **"Owned by you"** (`assignee === user.who`) and **"In your buildings"**
   (watching — owned by someone else or unowned, with a one-tap **Take** that assigns to me).

@@ -7,18 +7,24 @@ import { useOrbit } from "@/store/OrbitProvider";
 import { ticketFlow } from "@/data/flow";
 import { advisoryChannel, portfolioChannels, seedChatFor } from "@/data/comms";
 import { BUILDINGS } from "@/data/seed";
-import { Icon, inputStyle, Select, Empty } from "@/components/ui";
+import { Btn, Icon, inputStyle, Select, Empty } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
 import { ChatThread } from "./ChatThread";
+import { NewConversation } from "./NewConversation";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 export function CommsPage() {
-  const { tickets, chat } = useOrbit();
+  const { tickets, chat, customChannels } = useOrbit();
   const base = useMemo(() => portfolioChannels(tickets, ticketFlow), [tickets]);
   const [extra, setExtra] = useState<Channel[]>([]);
-  const channels = useMemo(() => [...base, ...extra.filter((e) => !base.some((b) => b.id === e.id))], [base, extra]);
+  const [compose, setCompose] = useState(false);
+  // user-composed threads first, then the derived portfolio + advisory channels
+  const channels = useMemo(() => {
+    const seen = new Set<string>();
+    return [...customChannels, ...base, ...extra].filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+  }, [customChannels, base, extra]);
   const [q, setQ] = useState("");
   const [fb, setFb] = useState("All");
   const [sel, setSel] = useState<string | null>(base[0]?.id ?? null);
@@ -47,12 +53,15 @@ export function CommsPage() {
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         {/* conversation list */}
         <div style={{ width: 340, flexShrink: 0, borderRight: "1px solid var(--hair-2)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ padding: "14px 16px", display: "flex", gap: 8, borderBottom: "1px solid var(--hair-2)" }}>
-            <div style={{ position: "relative", flex: 1 }}>
-              <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }}><Icon name="search" size={14} color="var(--ink-4)" /></span>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people…" style={{ ...inputStyle, paddingLeft: 34, fontSize: 12 }} />
+          <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--hair-2)", display: "flex", flexDirection: "column", gap: 9 }}>
+            <Btn small primary icon="plus" onClick={() => setCompose(true)} style={{ width: "100%" }}>New conversation</Btn>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ position: "relative", flex: 1 }}>
+                <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }}><Icon name="search" size={14} color="var(--ink-4)" /></span>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people…" style={{ ...inputStyle, paddingLeft: 34, fontSize: 12 }} />
+              </div>
+              <Select options={[{ value: "All", label: "All" }, ...BUILDINGS.map((b) => ({ value: b.id, label: b.name }))]} value={fb} onChange={setFb} style={{ width: 96, fontSize: 12 }} />
             </div>
-            <Select options={[{ value: "All", label: "All" }, ...BUILDINGS.map((b) => ({ value: b.id, label: b.name }))]} value={fb} onChange={setFb} style={{ width: 96, fontSize: 12 }} />
           </div>
           <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto" }}>
             {list.map((c) => {
@@ -87,6 +96,7 @@ export function CommsPage() {
           )}
         </div>
       </div>
+      <NewConversation open={compose} onClose={() => setCompose(false)} onCreated={(id) => setSel(id)} />
     </div>
   );
 }
