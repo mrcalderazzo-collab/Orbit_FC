@@ -1,5 +1,10 @@
 # Orbit FC — Backend setup (Supabase)
 
+> **Status: ✅ provisioned & connected** (project `fwszdgsfbvqpgaeiechi`, org "Orbit
+> Facilities"). Schema + RLS + seed run and verified. Keys live in `.env.local`
+> (gitignored) — add them to Vercel too. Next: signup trigger → real login → data
+> migration table-by-table.
+
 The app ships as a Vite SPA that runs entirely on an in-memory store, so it works
 with **zero backend**. This guide turns on the **real backend** — Postgres + Auth +
 Storage — using **Supabase**, chosen because it's one platform (no separate DB,
