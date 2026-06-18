@@ -267,6 +267,28 @@ Operator app, fully working on seed data:
   generic widget grid. Scoped to their buildings: a prioritized "Needs you now" stream (built
   from `attentionOf` + `nextAction`, sorted by attention then SLA) with one-tap commit (Take /
   Escalate / open Command), a KPI strip, a portfolio emergency banner, and a per-building rollup.
+- **Role cockpits on the scoping spine (✅ shipped):** `am`→PortfolioCockpit (owned vs
+  watching), `director`→DirectorRollup (manage-by-exception + per-AM workload),
+  `field`/`dispatch`→DispatchBoard (geo-batch clusters), `marketing`→ReputationStudio
+  (CSAT/detractors + live Sales proof pack). Identity exposes the RBAC spine: `isOrgWide`,
+  `operatorBuildings`, `operatorBuildingIds`, `scopeToPortfolio`, `can(user,action,entity)`.
+- **Portfolio scoping applied (✅ shipped):** Work Tickets + notification bell filter to the
+  operator's buildings for non-org-wide roles; org-wide roles + portals see all.
+- **Playbooks library (✅ shipped):** `features/playbooks/PlaybooksPage.tsx` over the existing
+  engine (`data/playbooks.ts` + `playbookFor` auto-applies a step checklist per ticket) — route
+  `playbooks`, live match counts, Emergency shown read-only.
+- **Agent layer (✅ shipped):** `features/agents/AgentsPage.tsx`, route `agents` — the
+  spine's specialized agents watch live data and recommend (human decides); heuristic today,
+  same surface drives live Claude when a key is set.
+- **Integrations hub (✅ shipped):** `features/integrations/IntegrationsHub.tsx`, route
+  `integrations` (replaced ComingSoon) — connector catalog with live, persisted connect state
+  (`integrations` + `toggleIntegration`).
+- **Bulk ticket actions (✅ shipped):** Work Tickets bulk bar (assign-to-me / route / escalate
+  the filtered set, confirm-guarded).
+- **Infra-gated (NOT built — need user decisions + credentials):** #44 real backend
+  (Postgres/Drizzle/tRPC/auth), #45 real comms send (Twilio/SendGrid), #46 real file storage
+  (S3/OCR), and the org-hierarchy half of #50 (regions/portfolios). The action seam is ready
+  for all of them.
 - **Compliance Command (✅ shipped):** `src/features/compliance/ComplianceCommand.tsx`, route
   `compliance` + Portfolio nav item (org-wide roles via `canSee`; manager perm added). Rolls
   every building record (`BUILDING_RECORDS`) + every vendor COI (`coiStatus`) into one
