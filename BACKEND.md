@@ -19,6 +19,9 @@ values, `src/lib/supabase.ts` exports `null` and the store keeps driving everyth
    [`supabase/schema.sql`](supabase/schema.sql) → Run.
 3. **Run the policies.** New query → paste all of
    [`supabase/policies.sql`](supabase/policies.sql) → Run. (RLS is now on.)
+3b. **Seed the org + buildings.** New query → paste [`supabase/seed.sql`](supabase/seed.sql)
+   → Run. Creates the org, per-AM portfolios, all 8 buildings (borough + association),
+   and core vendors. (Safe to re-run.) People/`app_users` link on first sign-in.
 4. **Copy your keys.** Project Settings → **API**:
    - Project URL → `VITE_SUPABASE_URL`
    - `anon` `public` key → `VITE_SUPABASE_ANON_KEY`
