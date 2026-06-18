@@ -28,6 +28,17 @@ export async function signIn(email: string, password: string): Promise<AppUserRo
   return profile;
 }
 
+/** create an account (the DB signup trigger creates the app_users profile). */
+export async function signUp(email: string, password: string): Promise<AppUserRow> {
+  const sb = requireSupabase();
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) throw error;
+  if (!data.session) throw new Error("Account created — but no session. Disable Auth → 'Confirm email' in Supabase so sign-up logs you in immediately, then try again.");
+  const profile = await currentAppUser();
+  if (!profile) throw new Error("Signed up, but no profile was created — did the signup trigger (auth-setup.sql) run?");
+  return profile;
+}
+
 /** passwordless magic-link sign-in (sends an email). */
 export async function signInWithMagicLink(email: string): Promise<void> {
   const sb = requireSupabase();

@@ -38,7 +38,30 @@ export const userById = (id: string | null): OrbitUser | null =>
 
 export function userPerson(u: OrbitUser | null) {
   if (!u) return null;
-  return u.persona === "operator" ? PEOPLE[u.who!] : u.person ?? null;
+  if (u.person) return u.person;                       // Supabase + portal users carry their own person
+  return u.persona === "operator" ? PEOPLE[u.who!] : null;  // demo operators resolve from PEOPLE
+}
+
+/** Map a Supabase `app_users` row into the OrbitUser the UI/store already speak.
+ *  Operators get full nav (perms ["all"]) — RLS is the real data gate at the DB. */
+export function appUserToOrbit(r: {
+  id: string; persona: string; role: string | null; name: string; email: string | null;
+  title: string | null; initials: string | null; color: string | null; company: string | null; building_id: string | null;
+}): OrbitUser {
+  const operator = r.persona === "operator";
+  return {
+    id: r.id,
+    persona: r.persona as OrbitUser["persona"],
+    role: r.role ?? undefined,
+    title: r.title ?? undefined,
+    email: r.email ?? "",
+    scope: r.title ?? "Orbit",
+    home: operator ? "dashboard" : "portal",
+    perms: operator ? ["all"] : undefined,
+    building: r.building_id ?? undefined,
+    company: r.company ?? undefined,
+    person: { name: r.name, initials: r.initials ?? r.name.slice(0, 2).toUpperCase(), color: r.color ?? "#3b82f6", role: r.title ?? "" },
+  };
 }
 
 export const userName = (u: OrbitUser | null): string => userPerson(u)?.name ?? "—";

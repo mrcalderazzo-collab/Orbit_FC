@@ -44,8 +44,10 @@ import { ticketFlow } from "@/data/flow";
 import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoStageKey } from "@/data/workorders";
 import { WO_STAGES } from "@/data/workorders";
 import { SEED_NOTICES, type Notice } from "@/data/notices";
-import { userById, userName } from "@/data/identity";
+import { userById, userName, appUserToOrbit } from "@/data/identity";
 import { autoRoute, teamByKey, escalateDeadline } from "@/data/routing";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { currentAppUser, onAuthChange, signIn as sbSignIn, signUp as sbSignUp, signOut as sbSignOut } from "@/lib/auth";
 import { SEED_EMERGENCIES, nextStepId, stepLabel } from "@/data/emergencies";
 
 // a few do-dates so the Focus board has content on first load
@@ -112,6 +114,10 @@ interface OrbitState {
   currentUser: OrbitUser | null;
   role: string;
   login: (id: string) => void;
+  /** real sign-in / sign-up via Supabase Auth (active when configured) */
+  loginEmail: (email: string, password: string, mode: "signin" | "signup") => Promise<void>;
+  /** true when a Supabase project is wired (env present) — drives the real login UI */
+  backendLive: boolean;
   logout: () => void;
   // theme
   theme: ThemeName;
@@ -288,7 +294,15 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const openCommand = useCallback((id: string) => setCommandId(id), []);
   const closeCommand = useCallback(() => setCommandId(null), []);
 
-  const currentUser = userById(userId);
+  // a real Supabase session (when configured) takes precedence over the demo picker
+  const [remoteUser, setRemoteUser] = useState<OrbitUser | null>(null);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    currentAppUser().then((p) => { if (p) setRemoteUser(appUserToOrbit(p)); });
+    return onAuthChange((p) => setRemoteUser(p ? appUserToOrbit(p) : null));
+  }, []);
+
+  const currentUser = remoteUser ?? userById(userId);
   const role = currentUser && currentUser.persona === "operator" ? "pm" : currentUser?.persona ?? "pm";
 
   useEffect(() => {
@@ -317,9 +331,19 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     notify("Signed in · " + userName(u));
   }, [notify]);
 
+  const loginEmail = useCallback<OrbitState["loginEmail"]>(async (email, password, mode) => {
+    const p = mode === "signup" ? await sbSignUp(email, password) : await sbSignIn(email, password);
+    const u = appUserToOrbit(p);
+    setRemoteUser(u);
+    setRoute({ page: u.persona === "operator" ? u.home || "dashboard" : "portal", id: null });
+    notify("Signed in · " + (u.person?.name ?? email));
+  }, [notify]);
+
   const logout = useCallback(() => {
     try { localStorage.removeItem("orbit_user"); } catch { /* ignore */ }
     setUserId(null);
+    setRemoteUser(null);
+    if (isSupabaseConfigured) sbSignOut();
     setRoute({ page: "dashboard", id: null });
   }, []);
 
@@ -843,7 +867,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
-    route, nav, currentUser, role, login, logout,
+    route, nav, currentUser, role, login, loginEmail, backendLive: isSupabaseConfigured, logout,
     theme, setTheme,
     tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket,
     spawnChildTicket, linkTickets, mergeTickets,
@@ -871,7 +895,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     customChannels, createChannel,
     integrations, toggleIntegration,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }
