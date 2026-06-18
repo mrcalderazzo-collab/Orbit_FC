@@ -21,6 +21,7 @@ import { EmergencyDeskPage } from "@/features/emergencies/EmergencyDeskPage";
 import { ComplianceCommand } from "@/features/compliance/ComplianceCommand";
 import { IntegrationsHub } from "@/features/integrations/IntegrationsHub";
 import { PlaybooksPage } from "@/features/playbooks/PlaybooksPage";
+import { AgentsPage } from "@/features/agents/AgentsPage";
 import { Portal } from "@/features/portal/Portal";
 import { OwnerConsole } from "@/features/owner/OwnerConsole";
 import { SalesMarketingPage } from "@/features/sales/SalesMarketingPage";
@@ -60,6 +61,8 @@ function CurrentPage() {
       return <ReportsPage />;
     case "datacenter":
       return <DataCenterPage />;
+    case "agents":
+      return <AgentsPage />;
     case "integrations":
       return <IntegrationsHub />;
     case "vendors":

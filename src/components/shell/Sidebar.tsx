@@ -31,6 +31,7 @@ const NAV: { sec: string; items: { id: string; label: string; icon: string; badg
     { id: "finance", label: "Finance", icon: "circle-dollar-sign" },
     { id: "reports", label: "Reports", icon: "bar-chart-3" },
     { id: "datacenter", label: "Data Center", icon: "database" },
+    { id: "agents", label: "Agent Layer", icon: "bot", badge: undefined },
     { id: "ai", label: "AI Review", icon: "brain-circuit", badge: "recs" },
   ] },
   { sec: "Growth & System", items: [
