@@ -20,6 +20,7 @@ import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { EmergencyDeskPage } from "@/features/emergencies/EmergencyDeskPage";
 import { ComplianceCommand } from "@/features/compliance/ComplianceCommand";
 import { IntegrationsHub } from "@/features/integrations/IntegrationsHub";
+import { PlaybooksPage } from "@/features/playbooks/PlaybooksPage";
 import { Portal } from "@/features/portal/Portal";
 import { OwnerConsole } from "@/features/owner/OwnerConsole";
 import { SalesMarketingPage } from "@/features/sales/SalesMarketingPage";
@@ -45,6 +46,8 @@ function CurrentPage() {
       return <BuildingsPage buildingId={route.id} />;
     case "compliance":
       return <ComplianceCommand />;
+    case "playbooks":
+      return <PlaybooksPage />;
     case "owner":
       return <OwnerConsole />;
     case "sales":
