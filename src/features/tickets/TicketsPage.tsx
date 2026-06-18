@@ -6,6 +6,7 @@ import { useOrbit } from "@/store/OrbitProvider";
 import { ticketApproval, ticketVendorName, type ApprovalState } from "@/lib/ticket";
 import { effectiveTeam, teamByKey, atFrontDesk } from "@/data/routing";
 import { ticketFlow } from "@/data/flow";
+import { isOrgWide, operatorBuildingIds, operatorBuildings } from "@/data/identity";
 import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
 import { Btn, Icon, inputStyle, Select } from "@/components/ui";
 import { TopBar } from "@/components/shell/TopBar";
@@ -43,17 +44,22 @@ export function TicketsPage() {
   const [view, setView] = useState(() => (currentUser?.role && DESK_ROLES.includes(currentUser.role)) || currentUser?.perms?.includes("all") ? "frontdesk" : "myqueue");
   const [creating, setCreating] = useState(false);
 
+  // portfolio scoping — AMs/field see only their buildings; org-wide roles see all
+  const scopeIds = useMemo(() => isOrgWide(currentUser) ? null : new Set(operatorBuildingIds(currentUser)), [currentUser]);
+  const scoped = useMemo(() => scopeIds ? tickets.filter((t) => scopeIds.has(t.building)) : tickets, [tickets, scopeIds]);
+  const buildingOpts = useMemo(() => (scopeIds ? operatorBuildings(currentUser) : BUILDINGS), [scopeIds, currentUser]);
+
   const flowMap = useMemo(() => {
     const m: Record<string, TicketFlow> = {};
-    tickets.forEach((t) => { m[t.id] = ticketFlow(t); });
+    scoped.forEach((t) => { m[t.id] = ticketFlow(t); });
     return m;
-  }, [tickets]);
+  }, [scoped]);
 
   const vendorOptions = useMemo(() => {
     const set = new Set<string>();
-    tickets.forEach((t) => { const v = ticketVendorName(t, flowMap[t.id]); if (v) set.add(v); });
+    scoped.forEach((t) => { const v = ticketVendorName(t, flowMap[t.id]); if (v) set.add(v); });
     return [...set].sort();
-  }, [tickets, flowMap]);
+  }, [scoped, flowMap]);
 
   const myWho = currentUser?.persona === "operator" ? currentUser.who : undefined;
   const needsReply = (t: typeof tickets[number]) => {
@@ -61,7 +67,7 @@ export function TicketsPage() {
     const msgs = ticketMessages[t.id] || (f ? seedMessageList(t, f) : []);
     return msgs[msgs.length - 1]?.dir === "in";
   };
-  const filtered = tickets.filter((t) => {
+  const filtered = scoped.filter((t) => {
     const f = flowMap[t.id];
     if (t.mergedInto) return false; // duplicates folded into their canonical ticket
     if (preset === "mine" && !(myWho && BUILDINGS.find((b) => b.id === t.building)?.am === myWho)) return false;
@@ -87,14 +93,14 @@ export function TicketsPage() {
 
   const viewCount: Record<string, number> = { frontdesk: filtered.filter(atFrontDesk).length, myqueue: mine.length };
 
-  const active = tickets.filter((t) => t.status !== "Closed").length;
-  const critical = tickets.filter((t) => t.prio === "Critical" && t.status !== "Closed").length;
+  const active = scoped.filter((t) => t.status !== "Closed").length;
+  const critical = scoped.filter((t) => t.prio === "Critical" && t.status !== "Closed").length;
   const anyFilter = fStatus !== "All" || fType !== "All" || fBuilding !== "All" || fVendor !== "All" || fApproval !== "All" || q;
   const clearAll = () => { setQ(""); setFStatus("All"); setFType("All"); setFBuilding("All"); setFVendor("All"); setFApproval("All"); };
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <TopBar title="Work Tickets" sub={active + " active · " + critical + " critical"}
+      <TopBar title="Work Tickets" sub={active + " active · " + critical + " critical" + (scopeIds ? " · your portfolio" : "")}
         right={<Btn primary icon="plus" onClick={() => setCreating(true)}>New Intake</Btn>} />
 
       <div style={{ padding: "16px 28px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", borderBottom: "1px solid var(--hair-2)" }}>
@@ -104,7 +110,7 @@ export function TicketsPage() {
         </div>
         <Select options={["All", ...TICKET_STATUS]} value={fStatus} onChange={setFStatus} style={{ width: 138 }} />
         <Select options={["All", ...TICKET_TYPES]} value={fType} onChange={setFType} style={{ width: 138 }} />
-        <Select options={[{ value: "All", label: "All buildings" }, ...BUILDINGS.map((b) => ({ value: b.id, label: b.name }))]} value={fBuilding} onChange={setFBuilding} style={{ width: 158 }} />
+        <Select options={[{ value: "All", label: scopeIds ? "My buildings" : "All buildings" }, ...buildingOpts.map((b) => ({ value: b.id, label: b.name }))]} value={fBuilding} onChange={setFBuilding} style={{ width: 158 }} />
         <Select options={[{ value: "All", label: "All vendors" }, ...vendorOptions.map((v) => ({ value: v, label: v }))]} value={fVendor} onChange={setFVendor} style={{ width: 160 }} />
         <Select options={APPROVAL_OPTS} value={fApproval} onChange={setFApproval} style={{ width: 150 }} />
         {anyFilter && (

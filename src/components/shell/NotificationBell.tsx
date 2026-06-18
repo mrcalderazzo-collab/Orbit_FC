@@ -2,9 +2,10 @@
 // stream (pushed in real time as tickets move, votes land, invoices post, etc.),
 // shows an unread count, and opens a dropdown. Used in the operator TopBar and
 // the external PortalShell. Operator passes onNavigate to jump to the source.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrbit } from "@/store/OrbitProvider";
 import type { NotifKind, OrbitNotification } from "@/store/OrbitProvider";
+import { isOrgWide, operatorBuildingIds } from "@/data/identity";
 import { Icon } from "@/components/ui";
 
 const SANS = "Outfit, sans-serif";
@@ -20,7 +21,13 @@ const META: Record<NotifKind, { icon: string; color: string }> = {
 };
 
 export function NotificationBell({ onNavigate }: { onNavigate?: (n: OrbitNotification) => void }) {
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useOrbit();
+  const { notifications: allNotifs, currentUser, markNotificationRead, markAllNotificationsRead } = useOrbit();
+  // scope to portfolio for non-org-wide operators; portals + org-wide see all
+  const notifications = useMemo(() => {
+    if (currentUser?.persona !== "operator" || isOrgWide(currentUser)) return allNotifs;
+    const ids = new Set(operatorBuildingIds(currentUser));
+    return allNotifs.filter((n) => !n.building || ids.has(n.building));
+  }, [allNotifs, currentUser]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const unread = notifications.filter((n) => !n.read).length;
