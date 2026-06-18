@@ -287,7 +287,7 @@ function BuildingDetail({ building, onBack }: { building: Building; onBack: () =
           ["people", "People", "users", 1 + roster.staff.length + roster.board.length],
           ["tickets", "Tickets", "ticket", activeTickets.length],
           ["activity", "Activity", "history", buildingEvents.length],
-          ["files", "Files & changes", "folder-kanban", dueRecords.length],
+          ["files", "Documents", "folder-kanban", dueRecords.length],
         ] as const).map(([key, label, icon, badge]) => (
           <button key={key} onClick={() => setTab(key)} className={tab === key ? "building-tab active" : "building-tab"}>
             <Icon name={icon} size={15} color={tab === key ? "var(--acc)" : "var(--ink-4)"} />{label}
@@ -577,7 +577,7 @@ function BuildingActivityTab({ events, onTicket }: { events: OrbitEvent[]; onTic
         <Glass style={{ padding: 17, position: "sticky", top: 0 }}>
           <SectionLabel style={{ marginBottom: 14 }}>Resume briefing</SectionLabel>
           <p style={{ margin: "0 0 14px", fontFamily: SANS, fontSize: 12.5, lineHeight: 1.55, color: "var(--ink-2)" }}>
-            A building-level timeline lets any PM, owner, or backup operator understand what changed without opening every ticket.
+            The <strong>automatic</strong> event stream — every ticket move, message, invoice, vote, and document, recorded as it happens. (For human-logged physical changes, see Documents → Changes.) Any PM or backup operator can see what changed without opening every ticket.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             <MiniMetric label="Ticket events" value={String(ticketEvents)} color={ticketEvents ? "var(--acc-text)" : "var(--ink)"} />
@@ -733,10 +733,15 @@ function FilesChangesTab({ building, files, records, changes, onTicket }: { buil
   return (
     <div>
       <div className="building-subtabs">
-        <button onClick={() => setSection("files")} className={section === "files" ? "active" : ""}>Files <span>{files.length + docs.length}</span></button>
-        <button onClick={() => setSection("changes")} className={section === "changes" ? "active" : ""}>Building changes <span>{changes.length}</span></button>
-        <button onClick={() => setSection("records")} className={section === "records" ? "active" : ""}>Compliance records <span>{records.length}</span></button>
+        <button onClick={() => setSection("files")} className={section === "files" ? "active" : ""}>Documents <span>{files.length + docs.length}</span></button>
+        <button onClick={() => setSection("changes")} className={section === "changes" ? "active" : ""}>Changes <span>{changes.length}</span></button>
+        <button onClick={() => setSection("records")} className={section === "records" ? "active" : ""}>Compliance <span>{records.length}</span></button>
       </div>
+      <p style={{ margin: "0 0 14px", fontFamily: SANS, fontSize: 12, color: "var(--ink-4)", lineHeight: 1.5 }}>
+        {section === "files" && "Stored documents — plans, COIs, contracts, manuals, photo sets. Filed from here, the Log-file action, or a system's detail."}
+        {section === "changes" && "A human-logged history of physical/operational changes to the building (“replaced lobby intercom”). For the automatic system event stream, see the Activity tab."}
+        {section === "records" && "Compliance posture — insurance, inspections, contracts, governance — with status and due dates. The portfolio-wide view lives in Compliance Command."}
+      </p>
       {section === "files" && (
         <div className="building-list-grid">
           {docs.map((d) => (
