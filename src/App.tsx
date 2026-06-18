@@ -19,7 +19,7 @@ import { LiveOpsPage } from "@/features/live/LiveOpsPage";
 import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { EmergencyDeskPage } from "@/features/emergencies/EmergencyDeskPage";
 import { ComplianceCommand } from "@/features/compliance/ComplianceCommand";
-import { ComingSoon } from "@/features/placeholder/ComingSoon";
+import { IntegrationsHub } from "@/features/integrations/IntegrationsHub";
 import { Portal } from "@/features/portal/Portal";
 import { OwnerConsole } from "@/features/owner/OwnerConsole";
 import { SalesMarketingPage } from "@/features/sales/SalesMarketingPage";
@@ -58,7 +58,7 @@ function CurrentPage() {
     case "datacenter":
       return <DataCenterPage />;
     case "integrations":
-      return <ComingSoon title="Integrations" icon="blocks" note="Connect Gmail, Slack, QuickBooks, DocuSign, Stripe and more — intake routing, ledger sync, e-signing." />;
+      return <IntegrationsHub />;
     case "vendors":
       return <VendorsPage />;
     default:

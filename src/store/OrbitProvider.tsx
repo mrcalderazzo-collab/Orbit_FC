@@ -226,6 +226,9 @@ interface OrbitState {
   // user-composed conversations (new threads to any recipients)
   customChannels: Channel[];
   createChannel: (channel: Channel, first?: { via: CommVia; text: string }) => void;
+  // integrations hub (connected connector ids)
+  integrations: string[];
+  toggleIntegration: (id: string, label: string) => void;
   // toast
   toast: Toast;
   notify: (msg: string, kind?: "ok" | "err") => void;
@@ -279,6 +282,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [workOrders, setWorkOrders] = useState<Record<string, WorkOrder>>(() => seedWorkOrders(TICKETS, ticketFlow));
   const [chat, setChat] = useState<Record<string, ChatMessage[]>>({});
   const [customChannels, setCustomChannels] = useState<Channel[]>([]);
+  const [integrations, setIntegrations] = useState<string[]>(() => ["gmail", "quickbooks"]);
   const [commandId, setCommandId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const openCommand = useCallback((id: string) => setCommandId(id), []);
@@ -751,6 +755,15 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     logEvent({ kind: "comm.thread", entityType: "channel", entityId: channel.id, summary: "New conversation · " + channel.title, building: channel.buildingId === "all" ? undefined : channel.buildingId });
   }, [notify, logEvent]);
 
+  const toggleIntegration = useCallback<OrbitState["toggleIntegration"]>((id, label) => {
+    setIntegrations((xs) => {
+      const on = xs.includes(id);
+      notify(on ? label + " disconnected" : label + " connected");
+      logEvent({ kind: on ? "integration.disconnected" : "integration.connected", entityType: "integration", entityId: id, summary: (on ? "Disconnected " : "Connected ") + label });
+      return on ? xs.filter((x) => x !== id) : [...xs, id];
+    });
+  }, [notify, logEvent]);
+
   const sendChat = useCallback<OrbitState["sendChat"]>((channel, payload) => {
     const msg: ChatMessage = { id: "m" + Date.now(), channelId: channel.id, senderId: "me", via: payload.via, text: payload.text, at: stamp(), toAll: payload.toAll };
     setChat((s) => ({ ...s, [channel.id]: [...(s[channel.id] || []), msg] }));
@@ -808,6 +821,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       if (s.ticketProgress) setTicketProgress(s.ticketProgress);
       if (s.chat) setChat(s.chat);
       if (s.customChannels) setCustomChannels(s.customChannels);
+      if (s.integrations) setIntegrations(s.integrations);
       if (s.notices) setNotices(s.notices);
       if (s.recs) setRecs(s.recs);
       if (s.workOrders) setWorkOrders(s.workOrders);
@@ -824,9 +838,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
+      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
-  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, logout,
@@ -855,8 +869,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog,
     chat, seedChat, sendChat,
     customChannels, createChannel,
+    integrations, toggleIntegration,
     toast, notify,
-  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }
