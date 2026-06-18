@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { ticketApproval, ticketVendorName, type ApprovalState } from "@/lib/ticket";
-import { effectiveTeam, teamByKey, atFrontDesk } from "@/data/routing";
+import { effectiveTeam, teamByKey, atFrontDesk, ROUTABLE } from "@/data/routing";
 import { ticketFlow } from "@/data/flow";
 import { isOrgWide, operatorBuildingIds, operatorBuildings } from "@/data/identity";
 import { BUILDINGS, TICKET_STATUS, TICKET_TYPES } from "@/data/seed";
@@ -33,7 +33,7 @@ const DESK_ROLES = ["dispatch", "principal", "director", "manager"];
 const PRESETS: [string, string][] = [["all", "All"], ["mine", "My buildings"], ["unowned", "Unowned"], ["sla", "SLA risk"], ["reply", "Awaiting reply"]];
 
 export function TicketsPage() {
-  const { tickets, openCommand, currentUser, ticketMessages } = useOrbit();
+  const { tickets, openCommand, currentUser, ticketMessages, assignTicket, routeTicket, escalateTicket } = useOrbit();
   const [q, setQ] = useState("");
   const [preset, setPreset] = useState("all");
   const [fStatus, setFStatus] = useState("All");
@@ -140,6 +140,16 @@ export function TicketsPage() {
         })}
       </div>
 
+      {["list", "queue", "cards", "board"].includes(view) && (
+        <BulkBar
+          targets={filtered.filter((t) => t.status !== "Closed")}
+          myWho={myWho}
+          onAssignMe={(ids) => { if (myWho) ids.forEach((id) => assignTicket(id, myWho)); }}
+          onRoute={(ids, team) => ids.forEach((id) => routeTicket(id, team))}
+          onEscalate={(ids) => ids.forEach((id) => escalateTicket(id))}
+        />
+      )}
+
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 28px 28px", minHeight: 0 }}>
         {view === "frontdesk" && <FrontDesk tickets={filtered} flowMap={flowMap} onOpen={openCommand} />}
         {view === "myqueue" && <TicketQueue tickets={mine} onOpen={openCommand} flowMap={flowMap} />}
@@ -152,5 +162,40 @@ export function TicketsPage() {
 
       {creating && <NewIntakeWizard onClose={() => setCreating(false)} />}
     </div>
+  );
+}
+
+// BulkBar — act on every ticket matching the current filters at once. The blunt
+// instrument for scale: narrow with filters (building/status/type), then route,
+// assign, or escalate the whole set in one move. Confirms before applying.
+function BulkBar({ targets, myWho, onAssignMe, onRoute, onEscalate }: {
+  targets: { id: string }[];
+  myWho?: string;
+  onAssignMe: (ids: string[]) => void;
+  onRoute: (ids: string[], team: string) => void;
+  onEscalate: (ids: string[]) => void;
+}) {
+  const ids = targets.map((t) => t.id);
+  const n = ids.length;
+  if (!n) return null;
+  const confirmRun = (verb: string, run: () => void) => { if (window.confirm(`${verb} ${n} ticket${n > 1 ? "s" : ""} matching the current filters?`)) run(); };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 28px", borderBottom: "1px solid var(--hair-2)", background: "var(--fill-1)", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.12em", color: "var(--ink-4)" }}>BULK · {n} MATCHING</span>
+      {myWho && <BulkBtn icon="user-round" label="Assign to me" onClick={() => confirmRun("Assign to me", () => onAssignMe(ids))} />}
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Select options={[{ value: "", label: "Route to…" }, ...ROUTABLE.map((t) => ({ value: t.key, label: t.label }))]} value="" onChange={(v) => { if (v) confirmRun("Route", () => onRoute(ids, v)); }} style={{ width: 150, fontSize: 12 }} />
+      </span>
+      <BulkBtn icon="trending-up" label="Escalate priority" onClick={() => confirmRun("Escalate", () => onEscalate(ids))} />
+      <span style={{ fontFamily: SANS, fontSize: 11, color: "var(--ink-4)", marginLeft: "auto" }}>Narrow with the filters above, then act on the whole set.</span>
+    </div>
+  );
+}
+
+function BulkBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, cursor: "pointer", background: "var(--fill-2)", border: "1px solid var(--hair-3)", color: "var(--ink-2)", fontFamily: SANS, fontSize: 12, fontWeight: 600 }}>
+      <Icon name={icon} size={13} color="var(--ink-3)" />{label}
+    </button>
   );
 }
