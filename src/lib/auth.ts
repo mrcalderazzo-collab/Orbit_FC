@@ -33,7 +33,7 @@ export async function signUp(email: string, password: string): Promise<AppUserRo
   const sb = requireSupabase();
   const { data, error } = await sb.auth.signUp({ email, password });
   if (error) throw error;
-  if (!data.session) throw new Error("Account created — but no session. Disable Auth → 'Confirm email' in Supabase so sign-up logs you in immediately, then try again.");
+  if (!data.session) throw new Error("Account created! Check your email for a confirmation link, click it, then come back and use Sign in.");
   const profile = await currentAppUser();
   if (!profile) throw new Error("Signed up, but no profile was created — did the signup trigger (auth-setup.sql) run?");
   return profile;
