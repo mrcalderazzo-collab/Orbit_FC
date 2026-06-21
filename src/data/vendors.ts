@@ -48,5 +48,32 @@ export function coiStatus(v: Vendor): { status: CoiStatus; label: string; color:
 export const vendorByName = (name?: string | null): Vendor | undefined =>
   name ? VENDORS.find((v) => v.name === name) : undefined;
 
+export const vendorById = (id?: string | null): Vendor | undefined =>
+  id ? VENDORS.find((v) => v.id === id) : undefined;
+
+// Rank vendors against a free-text issue / trade ("Boiler", "Elevator stuck",
+// "HVAC"): token overlap against name + trades, best-graded first. Used to
+// recommend who can cover a batch of similar jobs across buildings.
+export function vendorsForIssue(query: string): Vendor[] {
+  const words = query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+  if (!words.length) return [];
+  return VENDORS
+    .map((v) => {
+      const hay = (v.name + " " + v.trades.join(" ")).toLowerCase();
+      let score = 0;
+      for (const w of words) if (hay.includes(w)) score += 1;
+      return { v, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || b.v.grade - a.v.grade)
+    .map((x) => x.v);
+}
+
+/** Best vendor for an issue, preferring one whose COI is still valid/expiring. */
+export function recommendedVendorForIssue(query: string): Vendor | undefined {
+  const ranked = vendorsForIssue(query);
+  return ranked.find((v) => coiStatus(v).status !== "expired") ?? ranked[0];
+}
+
 export const fmtCoiDate = (iso: string): string =>
   new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

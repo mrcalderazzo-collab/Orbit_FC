@@ -9,7 +9,9 @@ import { useOrbit } from "@/store/OrbitProvider";
 import { Btn, Icon, Tag } from "@/components/ui";
 import { Modal, Field, TextInput, Select, inputStyle } from "@/components/ui/form";
 import { NOTICE_AUDIENCES, NOTICE_CHANNELS } from "@/data/notices";
-import { vendorByName, coiStatus } from "@/data/vendors";
+import { VENDORS, vendorByName, coiStatus, fmtCoiDate } from "@/data/vendors";
+import { lastVendorFromTickets, ticketsForSystem } from "@/lib/systemMatch";
+import { genesisLedger, verifyLedger, type LedgerEntry } from "@/lib/ledger";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -54,31 +56,53 @@ export function BuildingActionModals({
 
 const labelStyle: React.CSSProperties = { fontFamily: MONO, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--ink-3)" };
 
-// ── System detail — vendor, contact, COI/contract docs, images, create-ticket ──
+// ── System detail — current vendor (editable), ticket-derived service history,
+//    a tamper-evident vendor ledger, COI/contract docs, images, create-ticket ──
 export function SystemDetailModal({
   building, system, open, onClose, onCreateTicket,
 }: { building: Building; system: BuildingSystem | null; open: boolean; onClose: () => void; onCreateTicket: (s: BuildingSystem) => void }) {
-  const { buildingDocs, addBuildingDoc, notify } = useOrbit();
+  const { buildingDocs, addBuildingDoc, notify, tickets, systemVendors, vendorLedgers, reassignSystemVendor, openCommand, nav } = useOrbit();
   const [docName, setDocName] = useState("");
   const [docKind, setDocKind] = useState("COI / Insurance");
+  const [editing, setEditing] = useState(false);
+  const [pick, setPick] = useState("");
+  const [reason, setReason] = useState("");
   if (!system) return null;
 
-  const vendor = vendorByName(system.vendor);
+  const currentVendorName = systemVendors[system.id] ?? system.vendor;
+  const vendor = vendorByName(currentVendorName);
   const coi = vendor ? coiStatus(vendor) : null;
-  const docs = (buildingDocs[building.id] || []).filter((d) => d.system === system.name || d.vendor === system.vendor);
+  const docs = (buildingDocs[building.id] || []).filter((d) => d.system === system.name || d.vendor === currentVendorName);
   const images = [
     { url: `https://picsum.photos/seed/${building.id}-${system.id}-a/360/240`, cap: "Equipment" },
     { url: `https://picsum.photos/seed/${building.id}-${system.id}-b/360/240`, cap: "Nameplate / serial" },
   ];
 
+  // AI ticket→system match: tickets that concern this system + the last vendor
+  // who actually worked one of them.
+  const matches = ticketsForSystem(system, tickets).slice(0, 4);
+  const lastFromTickets = lastVendorFromTickets(system, tickets);
+
+  // vendor history: stored chain, or a derived genesis so it's never empty.
+  const ledger: LedgerEntry[] = vendorLedgers[system.id]?.length
+    ? vendorLedgers[system.id]
+    : genesisLedger(currentVendorName, new Date(system.lastService + "T09:00:00").toISOString());
+  const ledgerOk = verifyLedger(ledger);
+
   const addDoc = () => {
     if (!docName.trim()) { notify("Name the document", "err"); return; }
-    addBuildingDoc(building.id, { name: docName.trim(), kind: docKind, system: system.name, vendor: system.vendor });
+    addBuildingDoc(building.id, { name: docName.trim(), kind: docKind, system: system.name, vendor: currentVendorName });
     setDocName("");
   };
+  const applyReassign = () => {
+    if (!pick) { notify("Pick a vendor first", "err"); return; }
+    reassignSystemVendor(system, pick, reason);
+    setEditing(false); setPick(""); setReason("");
+  };
+  const goVendor = () => { if (vendor) { onClose(); nav("vendors", vendor.id); } };
 
   return (
-    <Modal open={open} onClose={onClose} title={system.name} sub={building.name + " · " + system.kind + " · " + system.location} width={640}
+    <Modal open={open} onClose={onClose} title={system.name} sub={building.name + " · " + system.kind + " · " + system.location} width={680}
       footer={<>
         <Btn small ghost onClick={onClose}>Close</Btn>
         <Btn small primary icon="plus" onClick={() => onCreateTicket(system)}>Create ticket from this system</Btn>
@@ -93,12 +117,17 @@ export function SystemDetailModal({
       </div>
 
       {/* vendor card */}
-      <span style={labelStyle}>Service vendor</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", margin: "7px 0 16px", borderRadius: 12, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+        <span style={labelStyle}>Service vendor of record</span>
+        <button onClick={() => setEditing((v) => !v)} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: editing ? "var(--ink-3)" : "var(--acc-text)" }}>
+          <Icon name={editing ? "x" : "pencil"} size={12} color={editing ? "var(--ink-3)" : "var(--acc-text)"} />{editing ? "Cancel" : "Reassign"}
+        </button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 13px", marginBottom: editing ? 10 : 16, borderRadius: 12, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
         <span style={{ width: 38, height: 38, borderRadius: 9, display: "grid", placeItems: "center", background: "rgba(var(--acc-rgb),0.1)" }}><Icon name="hard-hat" size={18} color="var(--acc-text)" /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <strong style={{ fontFamily: SANS, fontSize: 14, color: "var(--ink)" }}>{system.vendor}</strong>
+            <strong style={{ fontFamily: SANS, fontSize: 14, color: "var(--ink)" }}>{currentVendorName}</strong>
             {coi && <Tag color={coi.color}>{coi.label}{coi.days >= 0 ? ` · ${coi.days}d` : ""}</Tag>}
             {vendor && <Tag>Grade {vendor.grade}</Tag>}
           </div>
@@ -108,8 +137,62 @@ export function SystemDetailModal({
           <div style={{ display: "flex", gap: 7 }}>
             <a href={`tel:${vendor.phone}`} style={contactBtn} title={vendor.phone}><Icon name="phone" size={14} color="var(--ink-2)" /></a>
             <a href={`mailto:${vendor.email}`} style={contactBtn} title={vendor.email}><Icon name="mail" size={14} color="var(--ink-2)" /></a>
+            <button onClick={goVendor} style={contactBtn} title="Open vendor record"><Icon name="arrow-up-right" size={14} color="var(--ink-2)" /></button>
           </div>
         )}
+      </div>
+      {editing && (
+        <div style={{ padding: "12px 13px", marginBottom: 16, borderRadius: 12, background: "rgba(var(--acc-rgb),0.05)", border: "1px solid var(--hair-2)" }}>
+          <span style={labelStyle}>Assign a new vendor — recorded to the history ledger</span>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, margin: "9px 0" }}>
+            <select value={pick} onChange={(e) => setPick(e.target.value)} style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}>
+              <option value="">Choose vendor…</option>
+              {VENDORS.filter((v) => v.name !== currentVendorName).map((v) => <option key={v.id} value={v.name}>{v.name} · grade {v.grade}</option>)}
+            </select>
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (e.g. contract change)" style={inputStyle} />
+          </div>
+          <Btn small primary icon="check" onClick={applyReassign}>Confirm reassignment</Btn>
+        </div>
+      )}
+
+      {/* AI ticket→system match */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+        <Icon name="sparkles" size={13} color="var(--acc-text)" />
+        <span style={labelStyle}>Service history from tickets · AI match</span>
+      </div>
+      <div style={{ padding: "11px 13px", marginBottom: 16, borderRadius: 12, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
+        {lastFromTickets ? (
+          <p style={{ margin: "0 0 9px", fontFamily: SANS, fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            Last worked by <strong style={{ color: "var(--ink)" }}>{lastFromTickets.vendor}</strong> on <button onClick={() => { onClose(); openCommand(lastFromTickets.ticket.id); }} style={linkBtn}>{lastFromTickets.ticket.id}</button> — {lastFromTickets.ticket.title}.
+          </p>
+        ) : (
+          <p style={{ margin: "0 0 9px", fontFamily: SANS, fontSize: 12.5, color: "var(--ink-4)", lineHeight: 1.5 }}>No tickets matched to this system yet. Matched work will appear here automatically.</p>
+        )}
+        {matches.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {matches.map((m) => (
+              <button key={m.ticket.id} onClick={() => { onClose(); openCommand(m.ticket.id); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "7px 9px", borderRadius: 9, background: "var(--fill-1)", border: "1px solid var(--hair-2)", cursor: "pointer" }}>
+                <Icon name="ticket" size={13} color="var(--acc-text)" />
+                <span style={{ flex: 1, minWidth: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.ticket.title}{m.ticket.vendor ? <span style={{ color: "var(--ink-4)" }}> · {m.ticket.vendor}</span> : null}</span>
+                <span style={{ fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{m.ticket.status}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* vendor history ledger (hash-chained) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
+        <Icon name="link" size={13} color="var(--acc-text)" />
+        <span style={labelStyle}>Vendor history · verified chain</span>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: ledgerOk ? "#22c55e" : "#ef4444" }}>
+          <Icon name={ledgerOk ? "shield-check" : "shield-x"} size={12} color={ledgerOk ? "#22c55e" : "#ef4444"} />{ledgerOk ? "Intact" : "Tampered"}
+        </span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        {[...ledger].reverse().map((e, i, arr) => (
+          <LedgerBlock key={e.seq} entry={e} current={i === 0} last={i === arr.length - 1} />
+        ))}
       </div>
 
       {/* service dates */}
@@ -151,7 +234,101 @@ export function SystemDetailModal({
 }
 
 const contactBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--fill-3)", border: "1px solid var(--hair-3)", cursor: "pointer", textDecoration: "none" };
+const linkBtn: React.CSSProperties = { background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: MONO, fontSize: 11, color: "var(--acc-text)", fontWeight: 700 };
 const fmtDate = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+const fmtStamp = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+
+// One block in the hash-chained vendor history. The mono hash + "prev" pointer
+// make the chain legible as a private ledger; the connector line ties blocks.
+function LedgerBlock({ entry, current, last }: { entry: LedgerEntry; current: boolean; last: boolean }) {
+  const color = entry.action === "assigned" ? "#22c55e" : entry.action === "replaced" ? "#3b82f6" : "#ef4444";
+  return (
+    <div style={{ display: "flex", gap: 11 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 3 }}>
+        <span style={{ width: 11, height: 11, borderRadius: 3, background: color, boxShadow: current ? `0 0 0 3px color-mix(in srgb, ${color} 25%, transparent)` : "none" }} />
+        {!last && <span style={{ flex: 1, width: 2, background: "var(--hair-2)", marginTop: 2 }} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <strong style={{ fontFamily: SANS, fontSize: 13, color: "var(--ink)" }}>{entry.vendor}</strong>
+          <Tag color={color}>{entry.action}</Tag>
+          {current && <Tag color="var(--acc-text)">current</Tag>}
+          <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{fmtStamp(entry.at)}</span>
+        </div>
+        {entry.reason && <p style={{ margin: "4px 0 0", fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.45 }}>{entry.reason} · {entry.by}</p>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, fontFamily: MONO, fontSize: 8, color: "var(--ink-5)" }}>
+          <span title="block hash">#{entry.seq} · {entry.hash}</span>
+          <span style={{ color: "var(--ink-5)" }}>← prev {entry.prevHash}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// VendorPeek — quick-glance vendor card on a building system, without opening the
+// full detail modal. Click to expand COI / grade / contact inline; "Open vendor"
+// jumps to the full vendor record.
+export function VendorPeek({ vendorName, label = "Service vendor" }: { vendorName: string; label?: string }) {
+  const { nav } = useOrbit();
+  const [open, setOpen] = useState(false);
+  const vendor = vendorByName(vendorName);
+  const coi = vendor ? coiStatus(vendor) : null;
+  return (
+    <span style={{ position: "relative", display: "block" }} onClick={(e) => e.stopPropagation()}>
+      <span style={{ display: "block", fontFamily: MONO, fontSize: 8, fontWeight: 700, color: "var(--ink-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+      <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, padding: 0, background: "none", border: "none", cursor: "pointer", maxWidth: "100%" }}>
+        <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vendorName}</span>
+        {coi && <span style={{ width: 7, height: 7, borderRadius: "50%", background: coi.color, flexShrink: 0 }} title={coi.label} />}
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={13} color="var(--ink-4)" />
+      </button>
+      {open && (
+        <>
+          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 41, width: 250, padding: 13, borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hair-3)", boxShadow: "0 14px 40px rgba(0,0,0,0.3)" }}>
+            {vendor ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", background: "rgba(var(--acc-rgb),0.1)" }}><Icon name="hard-hat" size={15} color="var(--acc-text)" /></span>
+                  <strong style={{ fontFamily: SANS, fontSize: 13.5, color: "var(--ink)" }}>{vendor.name}</strong>
+                </div>
+                {coi && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", marginBottom: 9, borderRadius: 9, background: `color-mix(in srgb, ${coi.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${coi.color} 28%, transparent)` }}>
+                    <Icon name={coi.status === "expired" ? "shield-x" : coi.status === "expiring" ? "shield-alert" : "shield-check"} size={13} color={coi.color} />
+                    <span style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 600, color: coi.color }}>{coi.label}</span>
+                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8, color: "var(--ink-4)" }}>{coi.status === "expired" ? Math.abs(coi.days) + "d ago" : fmtCoiDate(vendor.coiExpiry)}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  <PeekMeta label="grade" v={String(vendor.grade)} />
+                  <PeekMeta label="rating" v={vendor.rating.toFixed(1)} />
+                  <PeekMeta label="response" v={"~" + vendor.responseHrs + "h"} />
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <a href={`tel:${vendor.phone}`} style={{ ...peekBtn, textDecoration: "none" }}><Icon name="phone" size={13} color="var(--ink-2)" />Call</a>
+                  <a href={`mailto:${vendor.email}`} style={{ ...peekBtn, textDecoration: "none" }}><Icon name="mail" size={13} color="var(--ink-2)" />Email</a>
+                  <button onClick={() => { setOpen(false); nav("vendors", vendor.id); }} style={{ ...peekBtn, background: "rgba(var(--acc-rgb),0.12)", color: "var(--acc-text)" }}><Icon name="arrow-up-right" size={13} color="var(--acc-text)" />Open</button>
+                </div>
+              </>
+            ) : (
+              <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-3)" }}>No linked vendor record for "{vendorName}".</p>
+            )}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function PeekMeta({ label, v }: { label: string; v: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{v}</span>
+      <span style={{ fontFamily: MONO, fontSize: 7.5, color: "var(--ink-4)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+}
+
+const peekBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 5, flex: 1, padding: "7px 0", borderRadius: 8, background: "var(--fill-2)", border: "1px solid var(--hair-3)", fontFamily: "Outfit, sans-serif", fontSize: 11, color: "var(--ink-2)", cursor: "pointer" };
 
 function ChipRow({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
   return (

@@ -16,6 +16,7 @@ import {
 import type {
   AiRec,
   Building,
+  BuildingSystem,
   Channel,
   ChatMessage,
   ChecklistItem,
@@ -49,6 +50,7 @@ import { autoRoute, teamByKey, escalateDeadline } from "@/data/routing";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { currentAppUser, onAuthChange, signIn as sbSignIn, signUp as sbSignUp, signOut as sbSignOut } from "@/lib/auth";
 import { SEED_EMERGENCIES, nextStepId, stepLabel } from "@/data/emergencies";
+import { appendLedger, genesisLedger, type LedgerEntry, type LedgerAction } from "@/lib/ledger";
 
 // a few do-dates so the Focus board has content on first load
 const SEED_WORK_DATES: Record<string, string> = {
@@ -62,6 +64,33 @@ const SEED_CALENDAR: BuildingEvent[] = [
   { id: "cal3", buildingId: "b2", title: "FDNY sprinkler inspection", kind: "Inspection", at: addDaysISO(5) + "T10:00", by: "Priya Anand", source: "office" },
   { id: "cal4", buildingId: "b3", title: "Roof drain clearing before storm", kind: "Maintenance", at: addDaysISO(1) + "T08:00", by: "Tony Calabrese", source: "super", ticketId: "T-4779" },
 ];
+
+// a few systems start with real vendor history so the hash-chained ledger shows
+// a multi-block timeline out of the box (who served, when they left, who replaced
+// them). Keyed by system id ("{buildingId}-sys-{n}"); the last block's vendor
+// matches each system's current vendor of record so "current" lines up.
+const ledgerISO = (days: number) => new Date(addDaysISO(days) + "T09:00:00").toISOString();
+const chainOf = (steps: Array<{ vendor: string; action: LedgerAction; at: string; by: string; reason?: string }>): LedgerEntry[] =>
+  steps.reduce<LedgerEntry[]>((chain, s) => appendLedger(chain, s), []);
+
+const SEED_VENDOR_LEDGERS: Record<string, LedgerEntry[]> = {
+  // b2 · Elevator bank → Otis (current)
+  "b2-sys-1": chainOf([
+    { vendor: "Apex Vertical Transport", action: "assigned", at: ledgerISO(-760), by: "System of record", reason: "Vendor of record at building onboarding" },
+    { vendor: "Otis Elevator", action: "replaced", at: ledgerISO(-242), by: "Dana Whitfield", reason: "Apex COI lapsed; board approved switch to Otis after repeat Car B faults" },
+  ]),
+  // b4 · Heating plant → Cambridge & Leach (current), via Northeast Mechanical
+  "b4-sys-1": chainOf([
+    { vendor: "Boiler Pros NYC", action: "assigned", at: ledgerISO(-1010), by: "System of record", reason: "Vendor of record at building onboarding" },
+    { vendor: "Northeast Mechanical", action: "replaced", at: ledgerISO(-430), by: "Marcus Reyes", reason: "Consolidated all HVAC under one contract" },
+    { vendor: "Cambridge & Leach", action: "replaced", at: ledgerISO(-150), by: "Sarah Chen", reason: "Moved cast-iron heating plant to a boiler specialist" },
+  ]),
+  // b2 · Cooling towers → Northeast Mechanical (current)
+  "b2-sys-4": chainOf([
+    { vendor: "ChillTech Cooling", action: "assigned", at: ledgerISO(-690), by: "System of record", reason: "Vendor of record at building onboarding" },
+    { vendor: "Northeast Mechanical", action: "replaced", at: ledgerISO(-300), by: "Marcus Reyes", reason: "Bundled cooling towers into the Northeast Mechanical service contract" },
+  ]),
+};
 
 // a couple of seeded vendor ratings so the scorecard leaderboard isn't empty
 const SEED_RATINGS: Record<string, VendorRating[]> = {
@@ -203,6 +232,12 @@ interface OrbitState {
   // vendor scorecard ratings
   vendorRatings: Record<string, VendorRating[]>;
   rateVendor: (vendorId: string, dims: Record<string, number>, note?: string, building?: string) => void;
+
+  // per-system vendor of record (overrides the seed once reassigned) + the
+  // tamper-evident history chain behind it
+  systemVendors: Record<string, string>;
+  vendorLedgers: Record<string, LedgerEntry[]>;
+  reassignSystemVendor: (system: BuildingSystem, toVendor: string, reason: string) => void;
   // emergency desk (runs on EMERGENCY_WORKFLOW)
   emergencies: Emergency[];
   declareEmergency: (data: { title: string; building: string; type: string; sev: Emergency["sev"]; onBehalf: string; channel: string; note?: string; spawnTicket?: boolean }) => string;
@@ -275,6 +310,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [ticketPhotos, setTicketPhotos] = useState<Record<string, TicketPhoto[]>>({});
   const [vendorRatings, setVendorRatings] = useState<Record<string, VendorRating[]>>(() => ({ ...SEED_RATINGS }));
   const [buildingDocs, setBuildingDocs] = useState<Record<string, BuildingDoc[]>>({});
+  const [systemVendors, setSystemVendors] = useState<Record<string, string>>({});
+  const [vendorLedgers, setVendorLedgers] = useState<Record<string, LedgerEntry[]>>(() => ({ ...SEED_VENDOR_LEDGERS }));
   const [emergencies, setEmergencies] = useState<Emergency[]>(() => SEED_EMERGENCIES.map((e) => ({ ...e, log: [...e.log] })));
   const [events, setEvents] = useState<OrbitEvent[]>([]);
   const eventsFor = useCallback((entityType: string, entityId: string) => events.filter((e) => e.entityType === entityType && e.entityId === entityId), [events]);
@@ -677,6 +714,28 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     logEvent({ kind: "vendor.rated", entityType: "vendor", entityId: vendorId, summary: "Vendor rated", building });
   }, [currentUser, notify, logEvent]);
 
+  // Reassign the vendor of record for a system and chain it onto the system's
+  // tamper-evident history. If the system has no chain yet, we seed a genesis
+  // block from the vendor on record so the timeline is always complete.
+  const reassignSystemVendor = useCallback<OrbitState["reassignSystemVendor"]>((system, toVendor, reason) => {
+    const who = userName(currentUser);
+    setVendorLedgers((prev) => {
+      const chain = prev[system.id]?.length
+        ? prev[system.id]
+        : genesisLedger(systemVendors[system.id] ?? system.vendor, new Date(system.lastService + "T09:00:00").toISOString());
+      const from = chain[chain.length - 1].vendor;
+      if (from === toVendor) return { ...prev, [system.id]: chain };
+      const next = appendLedger(chain, {
+        vendor: toVendor, action: "replaced", at: new Date().toISOString(), by: who,
+        reason: reason.trim() || `Reassigned from ${from}`,
+      });
+      return { ...prev, [system.id]: next };
+    });
+    setSystemVendors((p) => ({ ...p, [system.id]: toVendor }));
+    notify(`${system.name} · vendor set to ${toVendor}`);
+    logEvent({ kind: "vendor.reassigned", entityType: "building", entityId: system.buildingId, building: system.buildingId, summary: `${system.name}: vendor reassigned to ${toVendor}` });
+  }, [currentUser, systemVendors, notify, logEvent]);
+
   // ── work orders ──
   const ensureWorkOrder = useCallback((t: Ticket) => {
     setWorkOrders((wos) => {
@@ -853,6 +912,8 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       if (s.calendar) setCalendar(s.calendar);
       if (s.ticketPhotos) setTicketPhotos(s.ticketPhotos);
       if (s.buildingDocs) setBuildingDocs(s.buildingDocs);
+      if (s.systemVendors) setSystemVendors(s.systemVendors);
+      if (s.vendorLedgers) setVendorLedgers(s.vendorLedgers);
       if (s.vendorRatings) setVendorRatings(s.vendorRatings);
       if (s.emergencies) setEmergencies(s.emergencies);
       if (s.notifications) setNotifications(s.notifications);
@@ -862,9 +923,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events }));
+      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
-  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, vendorRatings, emergencies, notifications, events]);
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, loginEmail, backendLive: isSupabaseConfigured, logout,
@@ -887,6 +948,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     ticketPhotos, addTicketPhoto,
     buildingDocs, addBuildingDoc,
     vendorRatings, rateVendor,
+    systemVendors, vendorLedgers, reassignSystemVendor,
     emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency,
     events, logEvent, eventsFor,
     notifications, pushNotification, markNotificationRead, markAllNotificationsRead,
@@ -895,7 +957,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     customChannels, createChannel,
     integrations, toggleIntegration,
     toast, notify,
-  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, systemVendors, vendorLedgers, reassignSystemVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

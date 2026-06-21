@@ -9,7 +9,7 @@ import { useOrbit, type OrbitEvent } from "@/store/OrbitProvider";
 import { AttentionChip, Avatar, Btn, Glass, Icon, PrioDot, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import { ThemeSwitcher } from "@/components/shell/TopBar";
 import { BuildingMap } from "./BuildingMap";
-import { BuildingActionBar, BuildingActionModals, SystemDetailModal } from "./BuildingActions";
+import { BuildingActionBar, BuildingActionModals, SystemDetailModal, VendorPeek } from "./BuildingActions";
 import { buildingImage } from "@/data/buildings";
 
 const SANS = "Outfit, sans-serif";
@@ -53,7 +53,7 @@ export function rowAttention(row: DirRow): { color: string; label: string } {
 }
 
 function BuildingDirectory({ onOpen }: { onOpen: (id: string) => void }) {
-  const { tickets } = useOrbit();
+  const { tickets, nav } = useOrbit();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "attention" | "healthy">("all");
   const [view, setView] = useState<DirView>("grid");
@@ -124,7 +124,7 @@ function BuildingDirectory({ onOpen }: { onOpen: (id: string) => void }) {
       )}
       {view === "map" && (
         <div className="building-view-body">
-          <BuildingMap rows={rows} onOpen={onOpen} />
+          <BuildingMap rows={rows} onOpen={onOpen} onVendor={(id) => nav("vendors", id)} />
         </div>
       )}
     </div>
@@ -422,6 +422,7 @@ function OverviewTab({
 }
 
 function SystemsTab({ building, systems, onTicket }: { building: Building; systems: BuildingSystem[]; onTicket: (id: string) => void }) {
+  const { systemVendors } = useOrbit();
   const [detailSys, setDetailSys] = useState<BuildingSystem | null>(null);
   const [ticketSys, setTicketSys] = useState<BuildingSystem | null>(null);
   return (
@@ -444,7 +445,7 @@ function SystemsTab({ building, systems, onTicket }: { building: Building; syste
             <div className="system-health-track"><span style={{ width: `${system.health}%`, background: meta.color }} /></div>
             <p style={{ margin: "12px 0", minHeight: 38, fontFamily: SANS, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-2)" }}>{system.signal}</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingTop: 11, borderTop: "1px solid var(--hair-2)" }}>
-              <MiniMetric label="Service vendor" value={system.vendor} />
+              <VendorPeek vendorName={systemVendors[system.id] ?? system.vendor} />
               <MiniMetric label="Next service" value={formatDate(system.nextService)} color={system.state === "risk" ? "#ef4444" : "var(--ink)"} />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }} onClick={(e) => e.stopPropagation()}>

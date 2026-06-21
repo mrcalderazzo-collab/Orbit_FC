@@ -34,6 +34,7 @@ export function PlannerPage() {
   const { tickets, currentUser, openCommand } = useOrbit();
   const myWho = currentUser?.persona === "operator" ? currentUser.who : undefined;
   const [notes, setNotes] = useState("");
+  const [selectedDay, setSelectedDay] = useState(todayISO());
 
   const today = todayISO();
   const mine = useMemo(() => tickets.filter((t) => {
@@ -53,8 +54,15 @@ export function PlannerPage() {
 
   const weekCounts = Array.from({ length: 7 }, (_, i) => {
     const d = addDaysISO(i);
-    return { iso: d, n: open.filter((t) => t.workDate === d).length };
+    return { iso: d, n: open.filter((t) => t.workDate === d).length, m: SITE_VISITS.filter((v) => v.startsAt.slice(0, 10) === d).length };
   });
+
+  // selected-day detail — meetings, tickets, availability for the clicked box
+  const dayVisits = SITE_VISITS.filter((v) => v.startsAt.slice(0, 10) === selectedDay).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const dayTickets = open.filter((t) => t.workDate === selectedDay);
+  const dayFree = Math.max(0, 9 - dayVisits.length);
+  const dayLabel = new Date(selectedDay + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const dayRel = selectedDay === today ? "Today" : selectedDay === addDaysISO(1) ? "Tomorrow" : DOW[new Date(selectedDay + "T12:00:00").getDay()];
   const dueThisWeek = open.filter((t) => t.workDate && t.workDate >= today && t.workDate <= addDaysISO(6)).length;
   const dueNextWeek = open.filter((t) => t.workDate && t.workDate > addDaysISO(6) && t.workDate <= addDaysISO(13)).length;
   const buildingsTouched = new Set(open.map((t) => t.building)).size;
@@ -76,20 +84,80 @@ export function PlannerPage() {
             <Kpi value={Math.max(0, 9 - meetingsToday)} label="Free Hours" suffix="h" />
           </div>
 
-          {/* week strip */}
+          {/* week strip — click a day to see what's on it */}
           <Glass style={{ padding: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 8 }}>
               {weekCounts.map((w, i) => {
                 const d = new Date(w.iso + "T12:00:00");
                 const isToday = w.iso === today;
+                const isSel = w.iso === selectedDay;
                 return (
-                  <div key={w.iso} style={{ textAlign: "center", padding: "8px 4px", borderRadius: 10, background: isToday ? "rgba(var(--acc-rgb),0.1)" : "var(--fill-1)", border: "1px solid " + (isToday ? "rgba(var(--acc-rgb),0.35)" : "var(--hair-2)") }}>
+                  <button key={w.iso} onClick={() => setSelectedDay(w.iso)} style={{ textAlign: "center", padding: "8px 4px", borderRadius: 10, cursor: "pointer", background: isSel ? "rgba(var(--acc-rgb),0.16)" : isToday ? "rgba(var(--acc-rgb),0.07)" : "var(--fill-1)", border: "1px solid " + (isSel ? "var(--acc)" : isToday ? "rgba(var(--acc-rgb),0.35)" : "var(--hair-2)") }}>
                     <div style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", color: "var(--ink-4)", textTransform: "uppercase" }}>{i === 0 ? "Today" : DOW[d.getDay()]}</div>
-                    <div style={{ fontFamily: SANS, fontSize: 18, fontWeight: 600, color: isToday ? "var(--acc-text)" : "var(--ink)", marginTop: 3 }}>{d.getDate()}</div>
-                    {w.n > 0 && <div style={{ fontFamily: MONO, fontSize: 8, color: "var(--ink-4)", marginTop: 2 }}>{w.n} task{w.n > 1 ? "s" : ""}</div>}
-                  </div>
+                    <div style={{ fontFamily: SANS, fontSize: 18, fontWeight: 600, color: isSel || isToday ? "var(--acc-text)" : "var(--ink)", marginTop: 3 }}>{d.getDate()}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4, minHeight: 8 }}>
+                      {w.n > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontFamily: MONO, fontSize: 8, color: "var(--ink-4)" }}><span style={{ width: 5, height: 5, borderRadius: 2, background: "var(--acc)" }} />{w.n}</span>}
+                      {w.m > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontFamily: MONO, fontSize: 8, color: "var(--ink-4)" }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: "#a855f7" }} />{w.m}</span>}
+                    </div>
+                  </button>
                 );
               })}
+            </div>
+          </Glass>
+
+          {/* selected-day detail */}
+          <Glass style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", borderBottom: "1px solid var(--hair-2)" }}>
+              <Icon name="calendar-days" size={15} color="var(--acc-text)" />
+              <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{dayLabel}</span>
+              <Tag color="var(--acc-text)">{dayRel}</Tag>
+              <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9, color: dayFree > 2 ? "#22c55e" : "#f59e0b" }}>
+                <Icon name="clock" size={13} color={dayFree > 2 ? "#22c55e" : "#f59e0b"} />{dayFree}h free · {dayVisits.length} mtg · {dayTickets.length} task{dayTickets.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+              {/* meetings */}
+              <div style={{ padding: "13px 16px", borderRight: "1px solid var(--hair-2)" }}>
+                <SectionLabel style={{ marginBottom: 10 }}>Meetings & visits</SectionLabel>
+                {dayVisits.length === 0 ? (
+                  <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-4)" }}>Nothing scheduled — {dayFree}h open.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                    {dayVisits.map((v) => (
+                      <div key={v.id} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "#a855f7", paddingTop: 1, width: 52, flexShrink: 0 }}>{new Date(v.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: "block", fontFamily: SANS, fontSize: 12.5, color: "var(--ink)" }}>{v.title}</span>
+                          <span style={{ display: "block", fontFamily: MONO, fontSize: 8.5, color: "var(--ink-4)" }}>{buildingById(v.buildingId)?.name}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* tickets due */}
+              <div style={{ padding: "13px 16px" }}>
+                <SectionLabel style={{ marginBottom: 10 }}>Tickets due</SectionLabel>
+                {dayTickets.length === 0 ? (
+                  <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-4)" }}>No tickets scheduled for this day.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {dayTickets.map((t) => {
+                      const b = buildingById(t.building);
+                      return (
+                        <button key={t.id} onClick={() => openCommand(t.id)} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: 0, background: "none", border: "none", cursor: "pointer" }}>
+                          <span style={{ width: 7, height: 7, borderRadius: 2, background: PRIO_COLOR[t.prio], flexShrink: 0 }} />
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "block", fontFamily: SANS, fontSize: 12.5, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+                            <span style={{ display: "block", fontFamily: MONO, fontSize: 8, color: b?.mono }}>{b?.name} · {t.id}</span>
+                          </span>
+                          <StatusTag status={t.status} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </Glass>
 

@@ -11,6 +11,7 @@ import { useOrbit } from "@/store/OrbitProvider";
 import { BUILDINGS } from "@/data/seed";
 import { BUILDING_GEO, buildingImage } from "@/data/buildings";
 import { categoryByKey } from "@/data/taxonomy";
+import { vendorByName, recommendedVendorForIssue, coiStatus } from "@/data/vendors";
 import { Btn, Glass, Icon, SectionLabel, StatusTag, Tag } from "@/components/ui";
 import type { DirRow } from "./BuildingsPage";
 import { rowAttention } from "./BuildingsPage";
@@ -27,9 +28,9 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
-interface Cluster { label: string; buildingIds: string[]; vendors: string[]; spreadKm: number; count: number }
+interface Cluster { label: string; buildingIds: string[]; vendors: string[]; spreadKm: number; count: number; recVendorId?: string; recVendorName?: string }
 
-export function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: string) => void }) {
+export function BuildingMap({ rows, onOpen, onVendor }: { rows: DirRow[]; onOpen: (id: string) => void; onVendor?: (vendorId: string) => void }) {
   const { theme } = useOrbit();
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -60,7 +61,8 @@ export function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: str
           const a = BUILDING_GEO[ids[i]], b = BUILDING_GEO[ids[j]];
           if (a && b) spread = Math.max(spread, haversineKm(a, b));
         }
-        return { label, buildingIds: ids, vendors: [...g.vendors], spreadKm: spread, count: g.count };
+        const rec = recommendedVendorForIssue(label);
+        return { label, buildingIds: ids, vendors: [...g.vendors], spreadKm: spread, count: g.count, recVendorId: rec?.id, recVendorName: rec?.name };
       })
       .sort((a, b) => b.buildingIds.length - a.buildingIds.length || a.spreadKm - b.spreadKm);
   }, [rows]);
@@ -143,7 +145,7 @@ export function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: str
             <p style={{ margin: 0, fontFamily: SANS, fontSize: 12.5, color: "var(--ink-3)", lineHeight: 1.5 }}>No shared open issue types across buildings right now. When the same problem appears in two or more, you'll see batching options here.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {clusters.map((c) => <ClusterRow key={c.label} c={c} onPick={setSelected} />)}
+              {clusters.map((c) => <ClusterRow key={c.label} c={c} onPick={setSelected} onVendor={onVendor} />)}
             </div>
           )}
         </Glass>
@@ -152,9 +154,13 @@ export function BuildingMap({ rows, onOpen }: { rows: DirRow[]; onOpen: (id: str
   );
 }
 
-function ClusterRow({ c, onPick }: { c: Cluster; onPick: (id: string) => void }) {
+function ClusterRow({ c, onPick, onVendor }: { c: Cluster; onPick: (id: string) => void; onVendor?: (vendorId: string) => void }) {
   const near = c.spreadKm <= 4;
   const names = c.buildingIds.map((id) => BUILDINGS.find((b) => b.id === id)?.name ?? id);
+  const recVendor = c.recVendorName ? vendorByName(c.recVendorName) : undefined;
+  const recCoi = recVendor ? coiStatus(recVendor) : null;
+  // already-assigned vendors on these tickets, resolved to records so we can link
+  const assigned = c.vendors.map((n) => vendorByName(n)).filter((v): v is NonNullable<typeof v> => !!v);
   return (
     <div style={{ padding: "11px 13px", borderRadius: 12, background: "var(--fill-1)", border: "1px solid var(--hair-2)", borderLeft: "3px solid " + (near ? "#22c55e" : "#f59e0b") }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -168,12 +174,31 @@ function ClusterRow({ c, onPick }: { c: Cluster; onPick: (id: string) => void })
           <button key={id} onClick={() => onPick(id)} style={{ fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)", background: "var(--fill-2)", border: "1px solid var(--hair-2)", borderRadius: 8, padding: "3px 9px", cursor: "pointer" }}>{names[i]}</button>
         ))}
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.5 }}>
+      <div style={{ fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.5, marginBottom: recVendor || assigned.length ? 9 : 0 }}>
         {near
           ? <><b style={{ color: "#22c55e" }}>Batchable</b> — {c.count} open {c.label.toLowerCase()} jobs in {c.buildingIds.length} buildings within ~{c.spreadKm.toFixed(1)} km. One crew can cover them.</>
           : <>{c.count} open {c.label.toLowerCase()} jobs across {c.buildingIds.length} buildings ({c.spreadKm.toFixed(0)} km apart) — separate trips.</>}
-        {c.vendors.length > 0 && <> Vendors: {c.vendors.join(", ")}.</>}
       </div>
+      {/* one vendor who can address them all → bring us to the vendor */}
+      {recVendor && (
+        <button onClick={() => onVendor?.(recVendor.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 9, background: "rgba(var(--acc-rgb),0.07)", border: "1px solid var(--hair-2)", cursor: "pointer" }}>
+          <Icon name="hard-hat" size={14} color="var(--acc-text)" />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: MONO, fontSize: 7.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--ink-4)" }}>One vendor covers all</span>
+            <span style={{ display: "block", fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{recVendor.name}</span>
+          </span>
+          {recCoi && <span style={{ width: 8, height: 8, borderRadius: "50%", background: recCoi.color }} title={recCoi.label} />}
+          <Icon name="arrow-up-right" size={14} color="var(--acc-text)" />
+        </button>
+      )}
+      {assigned.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 8 }}>
+          <span style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-5)" }}>Already on these:</span>
+          {assigned.map((v) => (
+            <button key={v.id} onClick={() => onVendor?.(v.id)} style={{ fontFamily: SANS, fontSize: 11, color: "var(--acc-text)", background: "var(--fill-2)", border: "1px solid var(--hair-2)", borderRadius: 7, padding: "2px 8px", cursor: "pointer" }}>{v.name}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
