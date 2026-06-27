@@ -10,7 +10,7 @@ import { useOrbit } from "@/store/OrbitProvider";
 import { tint } from "@/lib/format";
 import { BUILDINGS, PEOPLE, TICKET_PRIOS } from "@/data/seed";
 import {
-  ATTACH_KINDS, BILLABLE_TO, CATEGORIES, COMMON_AREAS, CONTACT_PREFS, INTAKE_CHANNELS,
+  ATTACH_KINDS, CATEGORIES, COMMON_AREAS, CONTACT_PREFS, INTAKE_CHANNELS,
   LOCATION_KINDS, SUBMITTER_ROLES, SUGGESTED_TAGS, SYSTEM_OPTIONS, UNIT_LINES, categoryByKey,
 } from "@/data/taxonomy";
 import { aiClassifyIntake } from "@/services/ai";
@@ -43,13 +43,23 @@ const initial: Form = {
   attachments: [], tags: [], billableTo: "Building — operating", estimate: "", warranty: false, assignee: "",
 };
 
+// derive a usable title from the free-text description when none was typed
+const deriveTitle = (s: string): string => {
+  const clean = s.trim().replace(/\s+/g, " ");
+  if (!clean) return "";
+  const firstSentence = clean.split(/[.!?\n]/)[0];
+  const words = firstSentence.split(" ").slice(0, 8).join(" ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
-  const { createTicket, openCommand } = useOrbit();
+  const { createTicket, openCommand, notify } = useOrbit();
   const [step, setStep] = useState(0);
   const [f, setF] = useState<Form>(initial);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((s) => ({ ...s, [k]: v }));
   const cat = categoryByKey(f.category);
-  const canCreate = !!f.category && !!f.title.trim();
+  // a category plus *something* to title it from (typed title or description)
+  const canCreate = !!f.category && (!!f.title.trim() || !!f.desc.trim());
 
   const locationLabel = useMemo(() => {
     if (f.locKind === "unit") return "Unit " + (f.unit || "—") + (f.line ? f.line : "") + (f.floor ? " · Fl " + f.floor : "");
@@ -60,7 +70,10 @@ export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
   }, [f.locKind, f.unit, f.line, f.floor, f.area, f.systemKey]);
 
   const create = () => {
-    if (!cat || !canCreate) return;
+    // never fail silently — point the user at what's missing
+    if (!f.category || !cat) { setStep(0); notify("Pick a category to create the intake", "err"); return; }
+    const title = f.title.trim() || deriveTitle(f.desc) || cat.label;
+    if (!title) { setStep(0); notify("Add a title or a short description", "err"); return; }
     const owner = f.assignee || (cat.type === "Finance" || cat.type === "Documents" ? "cait" : cat.type === "Board request" ? "maura" : "luke");
     const submitterName = f.name.trim() || (f.role === "Anonymous" ? "Anonymous" : f.role);
     const requester = `${f.role}${f.unit ? " · Unit " + f.unit : ""}`;
@@ -79,11 +92,13 @@ export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
       access: { keyOnFile: f.keyOnFile, permissionToEnter: f.permissionToEnter, petOnSite: f.petOnSite, occupantPresent: f.occupantPresent, window: f.window || undefined },
       attachments: f.attachments,
       tags: f.tags,
-      billing: { billableTo: f.billableTo, estimate: f.estimate ? Number(f.estimate) : undefined, warranty: f.warranty },
+      // billing is NOT a requester decision — left unset here and set later by
+      // whoever works the ticket (Ticket Command → Intake → Billing & cost).
+      billing: { warranty: false },
       reportedAt: new Date().toISOString(),
     };
     const id = createTicket({
-      title: f.title.trim(), building: f.building, type: cat.type, prio: f.prio, requester,
+      title, building: f.building, type: cat.type, prio: f.prio, requester,
       desc: f.desc.trim(), status: f.assignee ? "Assigned" : "Open", assignee: f.assignee || owner,
       category: f.category, tags: f.tags, intake,
     });
@@ -100,7 +115,7 @@ export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
           {step > 0 && <Btn ghost icon="arrow-left" onClick={() => setStep((s) => s - 1)}>Back</Btn>}
           {step < STEPS.length - 1
             ? <Btn primary icon="arrow-right" onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !canCreate}>Continue</Btn>
-            : <Btn primary icon="send" onClick={create} disabled={!canCreate}>Create intake</Btn>}
+            : <Btn primary icon="send" onClick={create}>Create intake</Btn>}
         </div>
       }>
       <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 22, minHeight: 420 }}>
@@ -285,13 +300,14 @@ function StepDetails({ f, set }: { f: Form; set: SetFn }) {
         })}
       </div>
 
-      <Label>Billing & routing</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 14, alignItems: "end" }}>
-        <Field label="Billable to"><Select options={BILLABLE_TO} value={f.billableTo} onChange={(v) => set("billableTo", v)} /></Field>
-        <Field label="Est. cost ($)"><TextInput value={f.estimate} onChange={(e) => set("estimate", e.target.value.replace(/[^0-9]/g, ""))} placeholder="2500" /></Field>
+      <Label>Office routing (optional)</Label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, maxWidth: 360 }}>
         <Field label="Assign to"><Select options={[{ value: "", label: "Auto (by category)" }, ...OWNERS.map((p) => ({ value: p, label: PEOPLE[p].name }))]} value={f.assignee} onChange={(v) => set("assignee", v)} /></Field>
       </div>
-      <Check on={f.warranty} icon="shield-check" label="Possible warranty coverage" onClick={() => set("warranty", !f.warranty)} />
+      <div style={{ display: "flex", gap: 9, alignItems: "flex-start", marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "var(--fill-1)", border: "1px dashed var(--hair-strong)" }}>
+        <Icon name="info" size={15} color="var(--ink-4)" />
+        <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5 }}>Billing — who pays (building, reserve, resident, insurance, warranty) and the cost — is decided by whoever works the ticket, in <strong style={{ color: "var(--ink-2)" }}>Ticket Command → Intake → Billing &amp; cost</strong>. The requester never sets it.</span>
+      </div>
     </div>
   );
 }
@@ -301,6 +317,12 @@ function StepReview({ f, cat, locationLabel }: { f: Form; cat: ReturnType<typeof
   const b = BUILDINGS.find((x) => x.id === f.building)!;
   return (
     <div>
+      {!cat && (
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14, padding: "10px 13px", borderRadius: 10, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.35)" }}>
+          <Icon name="triangle-alert" size={15} color="#f59e0b" />
+          <span style={{ fontFamily: SANS, fontSize: 12.5, color: "var(--ink-2)" }}>Pick a <strong>category</strong> in step 1 — it's required to create the intake.</span>
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         {cat && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 99, background: tint(cat.color, 14), border: "1px solid " + tint(cat.color, 36), fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: cat.color }}><Icon name={cat.icon} size={12} color={cat.color} />{cat.label.toUpperCase()}</span>}
         {f.subcategory && <span style={{ fontFamily: MONO, fontSize: 9.5, color: "var(--ink-3)" }}>{f.subcategory}</span>}
@@ -315,7 +337,7 @@ function StepReview({ f, cat, locationLabel }: { f: Form; cat: ReturnType<typeof
         <Row k="Channel" v={f.channel} />
         <Row k="Contact" v={[f.phone, f.email].filter(Boolean).join(" · ") || "—"} />
         <Row k="Access" v={[f.permissionToEnter && "entry OK", f.keyOnFile && "key on file", f.occupantPresent && "occupant present", f.petOnSite && "pet on site"].filter(Boolean).join(" · ") || "—"} />
-        <Row k="Billable to" v={f.billableTo + (f.estimate ? " · $" + Number(f.estimate).toLocaleString() : "")} />
+        <Row k="Billing" v="Set by ops when working" />
         <Row k="Media" v={f.attachments.length ? f.attachments.length + " file(s)" : "none"} />
         <Row k="Owner" v={owner ? owner.name : "auto-routed"} node={owner ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Avatar person={owner} size={18} />{owner.name}</span> : undefined} />
       </div>
