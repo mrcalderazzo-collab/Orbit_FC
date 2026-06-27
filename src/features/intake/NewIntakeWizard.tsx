@@ -5,9 +5,10 @@
 // video / documents, operational tags, billing routing). Everything flows into
 // the ticket's structured `intake` and surfaces in the Intake tab.
 import { useMemo, useState, type ReactNode } from "react";
-import type { Priority, TicketAttachment, TicketIntakeDetail } from "@/lib/types";
+import type { Priority, Ticket, TicketAttachment, TicketIntakeDetail } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { tint } from "@/lib/format";
+import { autoRoute, teamByKey } from "@/data/routing";
 import { BUILDINGS, PEOPLE, TICKET_PRIOS } from "@/data/seed";
 import {
   ATTACH_KINDS, CATEGORIES, COMMON_AREAS, CONTACT_PREFS, INTAKE_CHANNELS,
@@ -43,6 +44,15 @@ const initial: Form = {
   attachments: [], tags: [], billableTo: "Building — operating", estimate: "", warranty: false, assignee: "",
 };
 
+// SLA budget by priority (hours) — mirrors the real clock in data/flow.ts
+const SLA_HRS: Record<Priority, number> = { Critical: 4, High: 24, Normal: 72, Low: 120 };
+const slaLabel = (p: Priority) => { const h = SLA_HRS[p]; return h >= 24 ? `${h / 24}d` : `${h}h`; };
+
+// default owner key by category type — same rule create() uses, so the preview
+// matches what actually happens
+const defaultOwnerKey = (type?: string) =>
+  type === "Finance" || type === "Documents" ? "cait" : type === "Board request" ? "maura" : "luke";
+
 // derive a usable title from the free-text description when none was typed
 const deriveTitle = (s: string): string => {
   const clean = s.trim().replace(/\s+/g, " ");
@@ -74,7 +84,7 @@ export function NewIntakeWizard({ onClose }: { onClose: () => void }) {
     if (!f.category || !cat) { setStep(0); notify("Pick a category to create the intake", "err"); return; }
     const title = f.title.trim() || deriveTitle(f.desc) || cat.label;
     if (!title) { setStep(0); notify("Add a title or a short description", "err"); return; }
-    const owner = f.assignee || (cat.type === "Finance" || cat.type === "Documents" ? "cait" : cat.type === "Board request" ? "maura" : "luke");
+    const owner = f.assignee || defaultOwnerKey(cat.type);
     const submitterName = f.name.trim() || (f.role === "Anonymous" ? "Anonymous" : f.role);
     const requester = `${f.role}${f.unit ? " · Unit " + f.unit : ""}`;
     const intake: TicketIntakeDetail = {
@@ -200,6 +210,15 @@ function StepWhat({ f, set, cat, locationLabel }: { f: Form; set: SetFn; cat: Re
         })}
       </div>
 
+      {f.category === "emergency" && (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 13px", marginBottom: 14, borderRadius: 11, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)" }}>
+          <Icon name="siren" size={17} color="#ef4444" />
+          <span style={{ fontFamily: SANS, fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            <strong style={{ color: "#ef4444" }}>Life-safety emergency.</strong> Priority is set to Critical and this routes to the central Facilities desk immediately on create. <strong style={{ color: "var(--ink)" }}>If anyone is in danger, call 911 first.</strong>
+          </span>
+        </div>
+      )}
+
       {cat && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Subcategory"><Select options={[{ value: "", label: "— select —" }, ...cat.subs.map((s) => ({ value: s, label: s }))]} value={f.subcategory} onChange={(v) => set("subcategory", v)} /></Field>
@@ -244,6 +263,12 @@ function StepWho({ f, set }: { f: Form; set: SetFn }) {
         <Field label="Preferred contact"><Select options={CONTACT_PREFS} value={f.preferredContact} onChange={(v) => set("preferredContact", v)} /></Field>
         <Field label="On behalf of (optional)"><TextInput value={f.onBehalfOf} onChange={(e) => set("onBehalfOf", e.target.value)} placeholder="Super reporting for Unit 3R" /></Field>
       </div>
+      {f.role !== "Anonymous" && !f.phone.trim() && !f.email.trim() && (
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
+          <Icon name="info" size={14} color="#f59e0b" />
+          <span style={{ fontFamily: SANS, fontSize: 12, color: "var(--ink-3)", lineHeight: 1.5 }}>No phone or email — we won't be able to send status updates back to the submitter. Add one if you have it.</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -315,6 +340,10 @@ function StepDetails({ f, set }: { f: Form; set: SetFn }) {
 function StepReview({ f, cat, locationLabel }: { f: Form; cat: ReturnType<typeof categoryByKey>; locationLabel: string }) {
   const owner = f.assignee ? PEOPLE[f.assignee] : null;
   const b = BUILDINGS.find((x) => x.id === f.building)!;
+  // live routing preview — exactly where this ticket will land on create
+  const route = cat ? autoRoute({ type: cat.type, category: f.category, prio: f.prio } as Ticket) : null;
+  const team = route ? teamByKey(route.team) : null;
+  const routedOwner = PEOPLE[f.assignee || defaultOwnerKey(cat?.type)];
   return (
     <div>
       {!cat && (
@@ -341,6 +370,33 @@ function StepReview({ f, cat, locationLabel }: { f: Form; cat: ReturnType<typeof
         <Row k="Media" v={f.attachments.length ? f.attachments.length + " file(s)" : "none"} />
         <Row k="Owner" v={owner ? owner.name : "auto-routed"} node={owner ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Avatar person={owner} size={18} />{owner.name}</span> : undefined} />
       </div>
+
+      {/* routing preview — where this lands on create */}
+      {route && team && (
+        <div style={{ marginTop: 16, padding: "13px 15px", borderRadius: 12, background: "var(--fill-1)", border: "1px solid var(--hair-2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
+            <Icon name="route" size={14} color="var(--acc-text)" />
+            <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ink-3)" }}>Where this goes</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 99, background: tint(team.color, 14), border: "1px solid " + tint(team.color, 36), fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>
+              <Icon name={team.icon} size={13} color={team.color} />{team.label}
+            </span>
+            <Icon name="arrow-right" size={14} color="var(--ink-4)" />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: SANS, fontSize: 12.5, color: "var(--ink-2)" }}><Avatar person={routedOwner} size={18} />{routedOwner.name}</span>
+            <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: f.prio === "Critical" ? "#ef4444" : "var(--ink-3)" }}>
+              <Icon name="timer" size={12} color={f.prio === "Critical" ? "#ef4444" : "var(--ink-4)"} />SLA {slaLabel(f.prio)}
+            </span>
+          </div>
+          {route.viaSuper && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#14b8a6" }}>
+              <Icon name="hammer" size={11} color="#14b8a6" />Super first · auto-escalates to Facilities in 24h
+            </div>
+          )}
+          <p style={{ margin: "9px 0 0", fontFamily: SANS, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.5 }}>{route.reason}.</p>
+        </div>
+      )}
+
       {f.tags.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16 }}>
           {f.tags.map((t) => <span key={t} style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", padding: "3px 9px", borderRadius: 99, background: "var(--fill-3)", border: "1px solid var(--hair-3)", color: "var(--ink-3)", textTransform: "uppercase" }}>{t}</span>)}
