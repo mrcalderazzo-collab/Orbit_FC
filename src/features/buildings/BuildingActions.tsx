@@ -3,7 +3,8 @@
 // OrbitProvider seam (createTicket / addCalendarEvent / sendNotice / logEvent),
 // so each one lands in the building's activity spine automatically. No new
 // backend surface — these are the same actions the future API will implement.
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Building, TicketType, Priority, BuildingSystem } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { Btn, Icon, Tag } from "@/components/ui";
@@ -265,26 +266,50 @@ function LedgerBlock({ entry, current, last }: { entry: LedgerEntry; current: bo
   );
 }
 
-// VendorPeek — quick-glance vendor card on a building system, without opening the
-// full detail modal. Click to expand COI / grade / contact inline; "Open vendor"
-// jumps to the full vendor record.
+// VendorPeek — quick-glance vendor card on a building system. The popover is
+// rendered in a PORTAL to <body> with fixed positioning anchored to the trigger,
+// so it floats above sibling cards (Glass uses backdrop-filter, which would
+// otherwise trap a normal z-indexed popover behind the next card). Click to see
+// COI / grade / contact / docs; "Open record" jumps to the full vendor.
+const PEEK_W = 268;
 export function VendorPeek({ vendorName, label = "Service vendor" }: { vendorName: string; label?: string }) {
-  const { nav } = useOrbit();
-  const [open, setOpen] = useState(false);
+  const { nav, vendorDocs } = useOrbit();
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const vendor = vendorByName(vendorName);
   const coi = vendor ? coiStatus(vendor) : null;
+  const docCount = vendor ? (vendorDocs[vendor.id]?.length ?? 0) : 0;
+
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.max(12, Math.min(r.left, window.innerWidth - PEEK_W - 12));
+    const below = window.innerHeight - r.bottom;
+    const up = below < 280; // flip above if there isn't room below
+    setPos({ top: up ? r.top - 8 : r.bottom + 6, left, up });
+  };
+  const toggle = () => (pos ? setPos(null) : place());
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = () => setPos(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [pos]);
+
   return (
-    <span style={{ position: "relative", display: "block" }} onClick={(e) => e.stopPropagation()}>
+    <span style={{ display: "block" }} onClick={(e) => e.stopPropagation()}>
       <span style={{ display: "block", fontFamily: MONO, fontSize: 8, fontWeight: 700, color: "var(--ink-4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
-      <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, padding: 0, background: "none", border: "none", cursor: "pointer", maxWidth: "100%" }}>
+      <button ref={btnRef} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, padding: 0, background: "none", border: "none", cursor: "pointer", maxWidth: "100%" }}>
         <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vendorName}</span>
         {coi && <span style={{ width: 7, height: 7, borderRadius: "50%", background: coi.color, flexShrink: 0 }} title={coi.label} />}
-        <Icon name={open ? "chevron-up" : "chevron-down"} size={13} color="var(--ink-4)" />
+        <Icon name={pos ? "chevron-up" : "chevron-down"} size={13} color="var(--ink-4)" />
       </button>
-      {open && (
+      {pos && createPortal(
         <>
-          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 6, zIndex: 41, width: 250, padding: 13, borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hair-3)", boxShadow: "0 14px 40px rgba(0,0,0,0.3)" }}>
+          <div onClick={() => setPos(null)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
+          <div style={{ position: "fixed", top: pos.top, left: pos.left, transform: pos.up ? "translateY(-100%)" : undefined, zIndex: 999, width: PEEK_W, padding: 13, borderRadius: 12, background: "var(--panel)", border: "1px solid var(--hair-3)", boxShadow: "0 14px 44px rgba(0,0,0,0.38)" }}>
             {vendor ? (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
@@ -303,17 +328,23 @@ export function VendorPeek({ vendorName, label = "Service vendor" }: { vendorNam
                   <PeekMeta label="rating" v={vendor.rating.toFixed(1)} />
                   <PeekMeta label="response" v={"~" + vendor.responseHrs + "h"} />
                 </div>
-                <div style={{ display: "flex", gap: 7 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 9px", marginBottom: 10, borderRadius: 9, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
+                  <Icon name="file-text" size={13} color="var(--ink-3)" />
+                  <span style={{ fontFamily: SANS, fontSize: 11.5, color: "var(--ink-2)" }}>{docCount} document{docCount === 1 ? "" : "s"} on file</span>
+                  <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 8, color: "var(--ink-4)" }}>contracts · COI</span>
+                </div>
+                <div style={{ display: "flex", gap: 7, marginBottom: 7 }}>
                   <a href={`tel:${vendor.phone}`} style={{ ...peekBtn, textDecoration: "none" }}><Icon name="phone" size={13} color="var(--ink-2)" />Call</a>
                   <a href={`mailto:${vendor.email}`} style={{ ...peekBtn, textDecoration: "none" }}><Icon name="mail" size={13} color="var(--ink-2)" />Email</a>
-                  <button onClick={() => { setOpen(false); nav("vendors", vendor.id); }} style={{ ...peekBtn, background: "rgba(var(--acc-rgb),0.12)", color: "var(--acc-text)" }}><Icon name="arrow-up-right" size={13} color="var(--acc-text)" />Open</button>
                 </div>
+                <button onClick={() => { setPos(null); nav("vendors", vendor.id); }} style={{ ...peekBtn, width: "100%", background: "rgba(var(--acc-rgb),0.12)", color: "var(--acc-text)" }}><Icon name="arrow-up-right" size={13} color="var(--acc-text)" />Open record · manage documents</button>
               </>
             ) : (
               <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-3)" }}>No linked vendor record for "{vendorName}".</p>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </span>
   );

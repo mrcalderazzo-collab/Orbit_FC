@@ -92,6 +92,19 @@ const SEED_VENDOR_LEDGERS: Record<string, LedgerEntry[]> = {
   ]),
 };
 
+// a few vendor documents on record so the contract/COI shelf isn't empty
+const SEED_VENDOR_DOCS: Record<string, VendorDoc[]> = {
+  v_otis: [
+    { id: "vd_otis_1", vendorId: "v_otis", name: "Otis master service agreement 2026.pdf", kind: "Contract", by: "Dana Whitfield", at: "Mar 3, 2026" },
+    { id: "vd_otis_2", vendorId: "v_otis", name: "Otis certificate of insurance.pdf", kind: "COI / Insurance", by: "System of record", at: "Jan 12, 2026" },
+    { id: "vd_otis_3", vendorId: "v_otis", name: "Otis W-9.pdf", kind: "W-9", by: "Accounts payable", at: "Jan 12, 2026" },
+  ],
+  v_nemech: [
+    { id: "vd_ne_1", vendorId: "v_nemech", name: "Northeast Mechanical HVAC service contract.pdf", kind: "Contract", by: "Marcus Reyes", at: "Feb 1, 2026" },
+    { id: "vd_ne_2", vendorId: "v_nemech", name: "Northeast Mechanical COI.pdf", kind: "COI / Insurance", by: "System of record", at: "Feb 1, 2026" },
+  ],
+};
+
 // a couple of seeded vendor ratings so the scorecard leaderboard isn't empty
 const SEED_RATINGS: Record<string, VendorRating[]> = {
   v_otis: [{ id: "vr_s1", vendorId: "v_otis", by: "Marcus Webb", at: "Jun 10", dims: { quality: 9, communication: 8, response: 9, pricing: 7, reliability: 9, professionalism: 9 }, note: "Fast on the elevator fault, clear comms.", building: "b2" }],
@@ -121,6 +134,9 @@ export interface TicketPhoto { id: string; url: string; caption: string; by: str
  *  COIs, contracts, manuals, reports. The real document home until object storage
  *  lands behind the same action. */
 export interface BuildingDoc { id: string; buildingId: string; name: string; kind: string; system?: string; vendor?: string; by: string; at: string; url?: string }
+/** a document filed against a vendor itself — contract, COI, W-9, agreement.
+ *  Lives at the vendor (not a building) so it follows the relationship. */
+export interface VendorDoc { id: string; vendorId: string; name: string; kind: string; by: string; at: string; url?: string }
 /** an append-only audit event. Every meaningful mutation emits one — the
  *  backend-ready spine for history, "what changed", and reporting. entityType +
  *  entityId tie it to a node in the portfolio graph (ticket / building / vendor…). */
@@ -238,6 +254,11 @@ interface OrbitState {
   systemVendors: Record<string, string>;
   vendorLedgers: Record<string, LedgerEntry[]>;
   reassignSystemVendor: (system: BuildingSystem, toVendor: string, reason: string) => void;
+
+  // documents filed against a vendor (contract, COI, W-9, agreement)
+  vendorDocs: Record<string, VendorDoc[]>;
+  addVendorDoc: (vendorId: string, doc: { name: string; kind: string }) => void;
+  removeVendorDoc: (vendorId: string, docId: string) => void;
   // emergency desk (runs on EMERGENCY_WORKFLOW)
   emergencies: Emergency[];
   declareEmergency: (data: { title: string; building: string; type: string; sev: Emergency["sev"]; onBehalf: string; channel: string; note?: string; spawnTicket?: boolean }) => string;
@@ -312,6 +333,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const [buildingDocs, setBuildingDocs] = useState<Record<string, BuildingDoc[]>>({});
   const [systemVendors, setSystemVendors] = useState<Record<string, string>>({});
   const [vendorLedgers, setVendorLedgers] = useState<Record<string, LedgerEntry[]>>(() => ({ ...SEED_VENDOR_LEDGERS }));
+  const [vendorDocs, setVendorDocs] = useState<Record<string, VendorDoc[]>>(() => ({ ...SEED_VENDOR_DOCS }));
   const [emergencies, setEmergencies] = useState<Emergency[]>(() => SEED_EMERGENCIES.map((e) => ({ ...e, log: [...e.log] })));
   const [events, setEvents] = useState<OrbitEvent[]>([]);
   const eventsFor = useCallback((entityType: string, entityId: string) => events.filter((e) => e.entityType === entityType && e.entityId === entityId), [events]);
@@ -736,6 +758,18 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     logEvent({ kind: "vendor.reassigned", entityType: "building", entityId: system.buildingId, building: system.buildingId, summary: `${system.name}: vendor reassigned to ${toVendor}` });
   }, [currentUser, systemVendors, notify, logEvent]);
 
+  const addVendorDoc = useCallback<OrbitState["addVendorDoc"]>((vendorId, doc) => {
+    const d: VendorDoc = { id: "vd" + Date.now(), vendorId, name: doc.name, kind: doc.kind, by: userName(currentUser), at: stamp() };
+    setVendorDocs((s) => ({ ...s, [vendorId]: [d, ...(s[vendorId] || [])] }));
+    notify("Document filed · " + doc.name);
+    logEvent({ kind: "vendor.doc", entityType: "vendor", entityId: vendorId, summary: "Vendor document filed · " + doc.name + " (" + doc.kind + ")" });
+  }, [currentUser, notify, logEvent]);
+
+  const removeVendorDoc = useCallback<OrbitState["removeVendorDoc"]>((vendorId, docId) => {
+    setVendorDocs((s) => ({ ...s, [vendorId]: (s[vendorId] || []).filter((d) => d.id !== docId) }));
+    notify("Document removed");
+  }, [notify]);
+
   // ── work orders ──
   const ensureWorkOrder = useCallback((t: Ticket) => {
     setWorkOrders((wos) => {
@@ -914,6 +948,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
       if (s.buildingDocs) setBuildingDocs(s.buildingDocs);
       if (s.systemVendors) setSystemVendors(s.systemVendors);
       if (s.vendorLedgers) setVendorLedgers(s.vendorLedgers);
+      if (s.vendorDocs) setVendorDocs(s.vendorDocs);
       if (s.vendorRatings) setVendorRatings(s.vendorRatings);
       if (s.emergencies) setEmergencies(s.emergencies);
       if (s.notifications) setNotifications(s.notifications);
@@ -923,9 +958,9 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorRatings, emergencies, notifications, events }));
+      localStorage.setItem("orbit_state_v2", JSON.stringify({ tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorDocs, vendorRatings, emergencies, notifications, events }));
     } catch { /* quota / disabled */ }
-  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorRatings, emergencies, notifications, events]);
+  }, [tickets, ballots, ticketComments, ticketMessages, ticketProgress, chat, customChannels, integrations, notices, recs, workOrders, shifts, calendar, ticketPhotos, buildingDocs, systemVendors, vendorLedgers, vendorDocs, vendorRatings, emergencies, notifications, events]);
 
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, loginEmail, backendLive: isSupabaseConfigured, logout,
@@ -949,6 +984,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     buildingDocs, addBuildingDoc,
     vendorRatings, rateVendor,
     systemVendors, vendorLedgers, reassignSystemVendor,
+    vendorDocs, addVendorDoc, removeVendorDoc,
     emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency,
     events, logEvent, eventsFor,
     notifications, pushNotification, markNotificationRead, markAllNotificationsRead,
@@ -957,7 +993,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     customChannels, createChannel,
     integrations, toggleIntegration,
     toast, notify,
-  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, systemVendors, vendorLedgers, reassignSystemVendor, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, systemVendors, vendorLedgers, reassignSystemVendor, vendorDocs, addVendorDoc, removeVendorDoc, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

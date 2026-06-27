@@ -3,8 +3,8 @@
 // flagged so they're not dispatched.
 import { useMemo, useState } from "react";
 import { VENDORS, coiStatus, fmtCoiDate, vendorById, type Vendor } from "@/data/vendors";
-import { Glass, Icon, Select, Btn } from "@/components/ui";
-import { Modal } from "@/components/ui/form";
+import { Glass, Icon, Select, Btn, Tag } from "@/components/ui";
+import { Modal, inputStyle } from "@/components/ui/form";
 import { TopBar } from "@/components/shell/TopBar";
 import { useOrbit } from "@/store/OrbitProvider";
 import { BUILDINGS } from "@/data/seed";
@@ -85,7 +85,14 @@ export function VendorsPage() {
   );
 }
 
+const VENDOR_DOC_KINDS = ["Contract", "COI / Insurance", "W-9", "Service agreement", "Warranty", "Other"];
+
 function VendorDetailModal({ vendor, systemVendors, onClose, onBuilding }: { vendor: Vendor; systemVendors: Record<string, string>; onClose: () => void; onBuilding: (id: string) => void }) {
+  const { vendorDocs, addVendorDoc, removeVendorDoc } = useOrbit();
+  const [docName, setDocName] = useState("");
+  const [docKind, setDocKind] = useState(VENDOR_DOC_KINDS[0]);
+  const docs = vendorDocs[vendor.id] || [];
+  const addDoc = () => { if (!docName.trim()) return; addVendorDoc(vendor.id, { name: docName.trim(), kind: docKind }); setDocName(""); };
   const coi = coiStatus(vendor);
   // systems this vendor currently services across the portfolio (respecting reassignments)
   const served = BUILDING_SYSTEMS
@@ -148,6 +155,32 @@ function VendorDetailModal({ vendor, systemVendors, onClose, onBuilding }: { ven
       ) : (
         <p style={{ margin: 0, fontFamily: SANS, fontSize: 12.5, color: "var(--ink-4)" }}>Not currently the vendor of record on any building system.</p>
       )}
+
+      {/* documents — contract, COI, W-9, agreements */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "20px 0 9px" }}>
+        <Icon name="folder-kanban" size={13} color="var(--acc-text)" />
+        <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--ink-3)" }}>Documents · contracts · COI · {docs.length}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+        {docs.length ? docs.map((d) => (
+          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", borderRadius: 10, background: "var(--fill-2)", border: "1px solid var(--hair-2)" }}>
+            <Icon name="file-text" size={15} color="var(--acc-text)" />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: SANS, fontSize: 12.5, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+              <span style={{ display: "block", fontFamily: MONO, fontSize: 8, color: "var(--ink-4)" }}>{d.kind} · {d.by} · {d.at}</span>
+            </span>
+            <Tag color="var(--acc-text)">{d.kind.split(" ")[0]}</Tag>
+            <button onClick={() => removeVendorDoc(vendor.id, d.id)} title="Remove" style={{ width: 26, height: 26, borderRadius: 7, display: "grid", placeItems: "center", background: "var(--fill-3)", border: "1px solid var(--hair-3)", cursor: "pointer" }}><Icon name="trash-2" size={13} color="var(--ink-4)" /></button>
+          </div>
+        )) : <p style={{ margin: 0, fontFamily: SANS, fontSize: 12, color: "var(--ink-4)" }}>No documents on file. Add the service contract, COI, or W-9 below.</p>}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={docName} onChange={(e) => setDocName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDoc()} placeholder="e.g. 2026 service contract.pdf" style={{ ...inputStyle, flex: 1 }} />
+        <select value={docKind} onChange={(e) => setDocKind(e.target.value)} style={{ ...inputStyle, width: 160, appearance: "none", cursor: "pointer" }}>
+          {VENDOR_DOC_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+        <Btn small primary icon="file-up" onClick={addDoc}>File</Btn>
+      </div>
     </Modal>
   );
 }
