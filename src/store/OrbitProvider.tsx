@@ -31,6 +31,7 @@ import type {
   OrgAuditEvent,
   OrgMember,
   OrbitUser,
+  StageKey,
   Ticket,
   TicketComment,
   TicketMessage,
@@ -41,7 +42,7 @@ import { addDaysISO, todayISO } from "@/lib/focus";
 import { AI_RECS, BUILDINGS, PEOPLE, TICKETS, buildingById } from "@/data/seed";
 import { CRM_ACTIVITIES, CRM_OPPORTUNITIES, MARKETING_CAMPAIGNS } from "@/data/crm";
 import { DEPARTMENTS, ORG_AUDIT, ORG_MEMBERS } from "@/data/organization";
-import { ticketFlow } from "@/data/flow";
+import { ticketFlow, STATUS_STAGE } from "@/data/flow";
 import { deriveWorkOrder, seedWorkOrders, type Invoice, type WorkOrder, type WoStageKey } from "@/data/workorders";
 import { WO_STAGES } from "@/data/workorders";
 import { SEED_NOTICES, type Notice } from "@/data/notices";
@@ -51,6 +52,13 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { currentAppUser, onAuthChange, signIn as sbSignIn, signUp as sbSignUp, signOut as sbSignOut } from "@/lib/auth";
 import { SEED_EMERGENCIES, nextStepId, stepLabel } from "@/data/emergencies";
 import { appendLedger, genesisLedger, type LedgerEntry, type LedgerAction } from "@/lib/ledger";
+
+// coarse status that each lifecycle stage maps to, so advancing the stage keeps
+// the status pill honest (the tracker carries the fine detail: sourcing/vote/scheduled)
+const STAGE_TO_STATUS: Record<StageKey, Ticket["status"]> = {
+  intake: "Open", triage: "Assigned", sourcing: "Assigned", vote: "Assigned",
+  scheduled: "Assigned", inprogress: "In progress", review: "Awaiting review", closed: "Closed",
+};
 
 // a few do-dates so the Focus board has content on first load
 const SEED_WORK_DATES: Record<string, string> = {
@@ -172,6 +180,7 @@ interface OrbitState {
   createTicket: (data: Partial<Ticket> & Pick<Ticket, "title" | "building" | "type" | "prio" | "requester">) => string;
   assignTicket: (id: string, who: string) => void;
   setTicketStatus: (id: string, status: Ticket["status"]) => void;
+  setStage: (id: string, stage: StageKey) => void;
   addTicketNote: (id: string, text: string) => void;
   updateTicket: (id: string, patch: Partial<Ticket>, note?: string) => void;
   /** set the operator's personal "do date" (ClickUp-style), or null to clear */
@@ -529,11 +538,23 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setTicketStatus = useCallback((id: string, status: Ticket["status"]) => {
-    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, status, verified: status === "Closed" ? true : t.verified, log: [...t.log, logLine("nick", "Status → " + status)] } : t));
+    // moving the status also moves the tracker to the matching stage, so the two
+    // never tell different stories
+    const stage = STATUS_STAGE[status];
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, status, stage, verified: status === "Closed" ? true : t.verified, log: [...t.log, logLine("nick", "Status → " + status)] } : t));
     const t = TICKETS.find((x) => x.id === id);
     pushNotification({ kind: "ticket", title: id + " → " + status, detail: t?.title, building: t?.building, ref: { page: "tickets", id } });
     logEvent({ kind: "ticket.status", entityType: "ticket", entityId: id, summary: "Status → " + status, building: t?.building });
   }, [pushNotification, logEvent]);
+
+  // advance/set the worked lifecycle stage; keeps the status pill in sync
+  const setStage = useCallback<OrbitState["setStage"]>((id, stage) => {
+    const status = STAGE_TO_STATUS[stage];
+    setTickets((ts) => ts.map((t) => t.id === id ? { ...t, stage, status, verified: stage === "closed" ? true : t.verified, log: [...t.log, logLine(me(), "Stage → " + stage)] } : t));
+    const t = tickets.find((x) => x.id === id);
+    notify(id + " → " + stage);
+    logEvent({ kind: "ticket.stage", entityType: "ticket", entityId: id, summary: "Stage → " + stage, building: t?.building });
+  }, [tickets, me, notify, logEvent]);
 
   const addTicketNote = useCallback((id: string, text: string) => {
     setTickets((ts) => ts.map((t) => t.id === id ? { ...t, log: [...t.log, logLine(me(), text)] } : t));
@@ -965,7 +986,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OrbitState>(() => ({
     route, nav, currentUser, role, login, loginEmail, backendLive: isSupabaseConfigured, logout,
     theme, setTheme,
-    tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket,
+    tickets, createTicket, assignTicket, setTicketStatus, setStage, addTicketNote, updateTicket, setWorkDate, escalateTicket,
     spawnChildTicket, linkTickets, mergeTickets,
     routeTicket, holdForInfo, releaseHold,
     commandId, openCommand, closeCommand,
@@ -993,7 +1014,7 @@ export function OrbitProvider({ children }: { children: ReactNode }) {
     customChannels, createChannel,
     integrations, toggleIntegration,
     toast, notify,
-  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, systemVendors, vendorLedgers, reassignSystemVendor, vendorDocs, addVendorDoc, removeVendorDoc, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
+  }), [route, nav, currentUser, role, login, loginEmail, logout, theme, setTheme, tickets, createTicket, assignTicket, setTicketStatus, setStage, addTicketNote, updateTicket, setWorkDate, escalateTicket, spawnChildTicket, linkTickets, mergeTickets, routeTicket, holdForInfo, releaseHold, ticketComments, seedComments, addComment, ticketMessages, seedMessages, sendTicketMessage, ticketProgress, seedProgress, setProgressItems, postProgress, recs, decideRec, addRecs, notices, sendNotice, orgMembers, orgBuildings, orgAudit, uiDirection, addOrgMember, updateOrgMember, removeOrgMember, addOrgBuilding, removeOrgBuilding, opportunities, crmActivities, campaigns, addOpportunity, updateOpportunity, addCrmActivity, ballots, castBallot, shifts, activeShift, punchIn, punchOut, calendar, addCalendarEvent, ticketPhotos, addTicketPhoto, buildingDocs, addBuildingDoc, vendorRatings, rateVendor, systemVendors, vendorLedgers, reassignSystemVendor, vendorDocs, addVendorDoc, removeVendorDoc, emergencies, declareEmergency, advanceEmergency, logEmergency, resolveEmergency, events, logEvent, eventsFor, notifications, pushNotification, markNotificationRead, markAllNotificationsRead, workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, addWoLog, chat, seedChat, sendChat, customChannels, createChannel, integrations, toggleIntegration, commandId, openCommand, closeCommand, toast, notify]);
 
   return <OrbitCtx.Provider value={value}>{children}</OrbitCtx.Provider>;
 }

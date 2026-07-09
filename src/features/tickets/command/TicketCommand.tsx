@@ -45,7 +45,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const f = useMemo(() => (t ? ticketFlow(t) : null), [t?.id, t?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const f = useMemo(() => (t ? ticketFlow(t) : null), [t?.id, t?.status, t?.stage]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!t || !f) return null;
   const b = BUILDINGS.find((x) => x.id === t.building)!;
   const cat = t.category ? categoryByKey(t.category) : undefined;
@@ -109,7 +109,7 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
         {/* stage tracker + plain-english summary */}
         <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--hair-2)", background: "var(--fill-1)" }}>
           <StageTracker f={f} />
-          <StageSummary f={f} onTab={setTab} />
+          <StageSummary t={t} f={f} onTab={setTab} />
         </div>
 
         {/* tabs */}

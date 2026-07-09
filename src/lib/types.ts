@@ -251,6 +251,10 @@ export interface Ticket {
   tags?: string[];
   /** full captured intake from the New Intake flow */
   intake?: TicketIntakeDetail;
+  /** the worked/advanced lifecycle stage. Once set (by advancing the ticket) it
+   *  is the source of truth — overriding the status- and seed-derived stage — so
+   *  the tracker reflects real actions on every ticket. */
+  stage?: StageKey;
   /** operator's personal "do date" (when they plan to work it) — ClickUp-style,
    *  distinct from the SLA / predicted-completion. ISO date or null. */
   workDate?: string | null;

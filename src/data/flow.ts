@@ -80,7 +80,7 @@ const FLOW_OVERRIDES: Record<string, { stage?: StageKey; estimate?: number }> = 
   "T-4765": { stage: "closed" },
 };
 
-const STATUS_STAGE: Record<string, StageKey> = {
+export const STATUS_STAGE: Record<string, StageKey> = {
   Open: "intake",
   Assigned: "triage",
   "In progress": "inprogress",
@@ -133,7 +133,8 @@ function buildUpdates(stage: StageKey, requiresVote: boolean, awarded: Bid | nul
 export function ticketFlow(t: Ticket): TicketFlow {
   const r = rng(seed(t.id + "flow"));
   const ov = FLOW_OVERRIDES[t.id] || {};
-  const stage: StageKey = ov.stage || STATUS_STAGE[t.status] || "intake";
+  // a stored (worked) stage wins; else the seed override; else derive from status
+  const stage: StageKey = t.stage || ov.stage || STATUS_STAGE[t.status] || "intake";
   const si = STAGE_INDEX[stage];
   const b = buildingById(t.building);
 

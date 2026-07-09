@@ -43,3 +43,12 @@ export function visibleStep(f: TicketFlow): { step: number; total: number } {
   const step = visible.filter((s) => STAGE_INDEX[s.key] <= f.stageIndex).length;
   return { step: Math.max(1, step), total: visible.length };
 }
+
+/** the next stage forward (skipping Board Vote when no vote is required), or
+ *  null if already closed. Drives the "advance the ticket" action. */
+export function nextStageKey(f: TicketFlow): StageKey | null {
+  const visible = FLOW_STAGES.filter((s) => !(s.key === "vote" && !f.requiresVote));
+  const i = visible.findIndex((s) => s.key === f.stage);
+  if (i === -1) return visible.find((s) => STAGE_INDEX[s.key] > f.stageIndex)?.key ?? null;
+  return visible[i + 1]?.key ?? null;
+}
