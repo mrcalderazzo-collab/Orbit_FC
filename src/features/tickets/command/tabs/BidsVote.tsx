@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { Bid, Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
+import { STAGE_INDEX } from "@/data/flow";
 import { dateShift, moneyFull, moneyShort } from "@/lib/format";
 import { Btn, Glass, Icon, SectionLabel, Tag } from "@/components/ui";
 
@@ -11,7 +12,7 @@ const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 export function BidsVote({ t, f }: { t: Ticket; f: TicketFlow }) {
-  const { notify, setTicketStatus, ballots, castBallot } = useOrbit();
+  const { notify, setStage, ballots, castBallot } = useOrbit();
   const [vote, setVote] = useState(() =>
     f.vote
       ? f.vote.board.map((m) => {
@@ -39,7 +40,8 @@ export function BidsVote({ t, f }: { t: Ticket; f: TicketFlow }) {
     setAwarded(bidId);
     const v = f.bids.find((b) => b.id === bidId)!;
     notify(v.vendor + " awarded · " + moneyFull(v.amount));
-    if (t.status === "Open" || t.status === "Assigned") setTicketStatus(t.id, "In progress");
+    // awarding a bid moves the ticket to Scheduled (forward-only)
+    if (f.stageIndex < STAGE_INDEX.scheduled) setStage(t.id, "scheduled");
   };
 
   return (

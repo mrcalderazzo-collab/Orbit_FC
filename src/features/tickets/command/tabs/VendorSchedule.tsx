@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import type { Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
+import { STAGE_INDEX } from "@/data/flow";
 import { moneyFull } from "@/lib/format";
 import { addDaysISO } from "@/lib/focus";
 import { coiStatus, vendorByName } from "@/data/vendors";
@@ -19,7 +20,7 @@ const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
 export function VendorSchedule({ t, f }: { t: Ticket; f: TicketFlow }) {
-  const { workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, notify, sendChat } = useOrbit();
+  const { workOrders, ensureWorkOrder, setWoStage, recordInvoice, setInvoiceStatus, notify, sendChat, setStage } = useOrbit();
   useEffect(() => { ensureWorkOrder(t); }, [t.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const wo = workOrders[t.id];
 
@@ -43,6 +44,8 @@ export function VendorSchedule({ t, f }: { t: Ticket; f: TicketFlow }) {
     if (vendorChannel) sendChat(vendorChannel, { via: "SMS", text: `Work order ${wo.id} — ${t.title}. Window: ${wo.window || "TBD"}. Access: ${f.intake.access}. Scope: ${wo.scope}. Please confirm ETA.` });
     setWoStage(t.id, "dispatched", "Dispatched to " + wo.vendorName + " — order sent with scope, access & window");
     notify("Work order " + wo.id + " dispatched");
+    // confirming/dispatching the vendor moves the ticket to In Progress
+    if (f.stageIndex < STAGE_INDEX.inprogress) setStage(t.id, "inprogress");
   };
   const advance = () => {
     const next = WO_STAGES[Math.min(WO_STAGES.length - 1, si + 1)];
@@ -92,7 +95,7 @@ export function VendorSchedule({ t, f }: { t: Ticket; f: TicketFlow }) {
       <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16, alignItems: "start" }}>
         {/* left: invoice/payment + schedule + handoff log */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <InvoicePanel t={t} wo={wo} onRecord={recordInvoice} onStatus={setInvoiceStatus} onClose={() => setWoStage(t.id, "closed", "Work order closed out & verified")} />
+          <InvoicePanel t={t} wo={wo} onRecord={recordInvoice} onStatus={setInvoiceStatus} onClose={() => { setWoStage(t.id, "closed", "Work order closed out & verified"); if (f.stageIndex < STAGE_INDEX.review) setStage(t.id, "review"); }} />
           <Glass style={{ padding: 16 }}>
             <SectionLabel style={{ marginBottom: 12 }}>Schedule & access</SectionLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
