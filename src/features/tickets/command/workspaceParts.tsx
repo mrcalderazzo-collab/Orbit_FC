@@ -6,6 +6,7 @@ import { STATUS_COLOR, statusLabel } from "@/lib/ticket";
 import { tint } from "@/lib/format";
 import { TICKET_STATUS } from "@/data/seed";
 import { FLOW_STAGES } from "@/data/flow";
+import { STAGE_BLURB, nextStepFor, visibleStep } from "./stageGuide";
 import { Icon } from "@/components/ui";
 
 const MONO = "'JetBrains Mono', monospace";
@@ -64,6 +65,36 @@ export function SlaChip({ f }: { f: TicketFlow }) {
         </div>
         <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: c }}>{f.sla.breached ? "BREACHED" : f.sla.hrs - f.sla.elapsed + "h"}</span>
       </div>
+    </div>
+  );
+}
+
+// A plain-English one-liner that sits under the stage tracker and answers, at a
+// glance: which step we're on, what that means, and the single next action.
+export function StageSummary({ f, onTab }: { f: TicketFlow; onTab: (k: string) => void }) {
+  const { step, total } = visibleStep(f);
+  const stageLabel = FLOW_STAGES.find((s) => s.key === f.stage)?.label ?? f.stage;
+  const next = nextStepFor(f);
+  const closed = f.stage === "closed";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--hair-2)", flexWrap: "wrap" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 11px", borderRadius: 99, background: "rgba(var(--acc-rgb),0.1)", border: "1px solid rgba(var(--acc-rgb),0.28)", flexShrink: 0 }}>
+        <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", color: "var(--acc-text)" }}>STEP {step}/{total}</span>
+        <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--ink-4)" }} />
+        <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>{stageLabel}</span>
+      </span>
+      <span style={{ fontFamily: SANS, fontSize: 12.5, color: "var(--ink-2)", flex: 1, minWidth: 180 }}>{STAGE_BLURB[f.stage]}</span>
+      {!closed && (
+        <button onClick={() => onTab(next.tab)} title={next.desc} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 13px", borderRadius: 99, cursor: "pointer", background: "var(--acc)", border: "none", flexShrink: 0 }}>
+          <span style={{ fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.1em", color: "var(--on-accent)", opacity: 0.7 }}>NEXT</span>
+          <Icon name={next.icon} size={14} color="var(--on-accent)" />
+          <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "var(--on-accent)" }}>{next.label}</span>
+          <Icon name="arrow-right" size={13} color="var(--on-accent)" />
+        </button>
+      )}
+      {closed && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: "#22c55e", flexShrink: 0 }}><Icon name="circle-check-big" size={15} color="#22c55e" />Resolved</span>
+      )}
     </div>
   );
 }

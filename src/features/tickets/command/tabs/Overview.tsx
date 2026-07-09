@@ -1,6 +1,6 @@
 // Overview tab — request, progress, next-action, cost posture, bids snapshot,
 // owner + submitter context. Mirrors TicketFlow.jsx FlowOverview.
-import type { Bid, Building, StageKey, Ticket, TicketFlow } from "@/lib/types";
+import type { Bid, Building, Ticket, TicketFlow } from "@/lib/types";
 import { useOrbit } from "@/store/OrbitProvider";
 import { moneyFull, moneyShort } from "@/lib/format";
 import { PEOPLE } from "@/data/seed";
@@ -9,6 +9,7 @@ import { Avatar, Btn, Glass, Icon, KV, SectionLabel } from "@/components/ui";
 import { SubtasksPanel } from "../SubtasksPanel";
 import { LinkMergeModal } from "../LinkMergeModal";
 import { ResumeBriefing } from "../ResumeBriefing";
+import { nextStepFor } from "../stageGuide";
 
 const SANS = "Outfit, sans-serif";
 const MONO = "'JetBrains Mono', monospace";
@@ -142,30 +143,20 @@ function RelRow({ icon, label, t, onOpen }: { icon: string; label: string; t: Ti
 }
 
 function NextActionCard({ f, onTab }: { f: TicketFlow; onTab: (k: string) => void }) {
-  const map: Record<StageKey, { t: string; d: string; ic: string; go: string }> = {
-    intake: { t: "Triage & route", d: "Confirm scope and assign an owner.", ic: "git-branch", go: "intake" },
-    triage: { t: "Source vendors", d: "Request competitive bids.", ic: "search-check", go: "sourcing" },
-    sourcing: { t: f.requiresVote ? "Open board vote" : "Award the bid", d: f.requiresVote ? "Send bids to the board." : "Pick a vendor and award.", ic: "vote", go: "sourcing" },
-    vote: { t: "Awaiting board", d: "Voting in progress — monitor results.", ic: "vote", go: "sourcing" },
-    scheduled: { t: "Confirm the visit", d: "Resident + vendor access locked.", ic: "calendar-check", go: "vendor" },
-    inprogress: { t: "Work underway", d: "Track progress, post updates.", ic: "wrench", go: "comms" },
-    review: { t: "Verify & close", d: "Final walkthrough and sign-off.", ic: "clipboard-check", go: "activity" },
-    closed: { t: "Resolved", d: "Chain-verified and closed.", ic: "circle-check-big", go: "activity" },
-  };
-  const a = map[f.stage] || map.intake;
+  const a = nextStepFor(f);
   return (
     <Glass accent="var(--acc)" style={{ padding: 16, borderLeft: "2px solid rgba(var(--acc-rgb),0.5)" }}>
       <SectionLabel style={{ marginBottom: 12 }}>Next action</SectionLabel>
       <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(var(--acc-rgb),0.12)", border: "1px solid rgba(var(--acc-rgb),0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Icon name={a.ic} size={17} color="var(--acc)" />
+          <Icon name={a.icon} size={17} color="var(--acc)" />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: SANS, fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>{a.t}</div>
-          <div style={{ fontFamily: SANS, fontSize: 11, color: "var(--ink-3)", marginTop: 1 }}>{a.d}</div>
+          <div style={{ fontFamily: SANS, fontSize: 14, color: "var(--ink)", fontWeight: 600 }}>{a.label}</div>
+          <div style={{ fontFamily: SANS, fontSize: 11, color: "var(--ink-3)", marginTop: 1 }}>{a.desc}</div>
         </div>
       </div>
-      <Btn small primary icon="arrow-right" onClick={() => onTab(a.go)} style={{ marginTop: 13, width: "100%", justifyContent: "center" }}>Go</Btn>
+      <Btn small primary icon="arrow-right" onClick={() => onTab(a.tab)} style={{ marginTop: 13, width: "100%", justifyContent: "center" }}>Go</Btn>
     </Glass>
   );
 }

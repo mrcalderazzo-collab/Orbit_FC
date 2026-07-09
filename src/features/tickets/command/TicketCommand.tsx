@@ -11,7 +11,8 @@ import { Icon, PrioDot, Tag } from "@/components/ui";
 import { CommsDock } from "@/features/comms/CommsDock";
 import { CloseOutModal } from "./CloseOutModal";
 import { DoDateMenu } from "../DoDateMenu";
-import { SlaChip, StageTracker, TicketStatusMenu } from "./workspaceParts";
+import { SlaChip, StageTracker, StageSummary, TicketStatusMenu } from "./workspaceParts";
+import { categoryByKey } from "@/data/taxonomy";
 import { Overview } from "./tabs/Overview";
 import { Intake } from "./tabs/Intake";
 import { BidsVote } from "./tabs/BidsVote";
@@ -47,6 +48,8 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
   const f = useMemo(() => (t ? ticketFlow(t) : null), [t?.id, t?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!t || !f) return null;
   const b = BUILDINGS.find((x) => x.id === t.building)!;
+  const cat = t.category ? categoryByKey(t.category) : undefined;
+  const loc = t.intake?.location?.label;
   const commCount = (ticketComments[t.id] || []).length + (ticketMessages[t.id] || []).length;
 
   return (
@@ -76,6 +79,8 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
               <span style={{ width: 7, height: 7, borderRadius: 2, background: b.mono }} />
               <span style={{ fontFamily: MONO, fontSize: 11, color: b.mono }}>{b.name}</span>
+              {cat && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10, fontWeight: 700, color: cat.color, background: `color-mix(in srgb, ${cat.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${cat.color} 30%, transparent)`, padding: "2px 8px", borderRadius: 99, textTransform: "uppercase" }}><Icon name={cat.icon} size={11} color={cat.color} />{cat.label}</span>}
+              {loc && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 11, color: "var(--ink-3)" }}><Icon name="map-pin" size={11} color="var(--ink-4)" />{loc}</span>}
               <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--ink-4)" }}>· est. {moneyFull(f.estimate)} · requested by {t.requester}</span>
             </div>
           </div>
@@ -101,9 +106,10 @@ export function TicketCommand({ id, onClose }: { id: string; onClose: () => void
           </button>
         </div>
 
-        {/* stage tracker */}
+        {/* stage tracker + plain-english summary */}
         <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--hair-2)", background: "var(--fill-1)" }}>
           <StageTracker f={f} />
+          <StageSummary f={f} onTab={setTab} />
         </div>
 
         {/* tabs */}
